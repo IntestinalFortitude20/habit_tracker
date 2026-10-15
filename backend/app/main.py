@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.entries import router as entries_router
 from app.api.habits import router as habits_router
+from app.api.metrics import router as metrics_router
+from app.api.stats import router as stats_router
 from app.core.config import settings
 from app.db.session import Base, engine
 
@@ -19,6 +22,9 @@ app.add_middleware(
 )
 
 app.include_router(habits_router)
+app.include_router(metrics_router)
+app.include_router(entries_router)
+app.include_router(stats_router)
 
 
 @app.get("/health")

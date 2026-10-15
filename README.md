@@ -104,18 +104,49 @@ Frontend runs on `http://localhost:5173` (desktop) and `http://<your-lan-ip>:517
 - `POST /api/habits`
 - `GET /api/habits`
 
+## ✅ Phase 1 Features
+
+- Metrics per habit (`boolean`, `count`, `duration`, `rating`, optional unit): add, edit, delete
+- Daily entry logging with completed flag + per-metric values
+- Stats: current streak, longest streak, 7d/30d completion rates
+
+### API summary
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST/GET | `/api/habits/{id}/metrics` | create / list |
+| GET/PUT/DELETE | `/api/habits/{id}/metrics/{metric_id}` | |
+| POST/GET | `/api/habits/{id}/entries` | POST **upserts** by date; GET supports `order=asc\|desc`, `limit` |
+| GET/PUT/DELETE | `/api/habits/{id}/entries/{entry_id}` | |
+| GET | `/api/habits/{id}/stats` | streaks, rates, totals |
+
+Metric values must reference metrics of the same habit (422 otherwise); unknown habit/metric/entry returns 404.
+Current streak = consecutive completed days ending today, or ending yesterday if today isn't completed yet.
+Rates = completed days in the trailing 7/30 days (incl. today) divided by 7/30. No DB migration is needed (existing tables are used).
+
+### Using the screens
+
+- `/habits`: create habits; click one to open it (shows its current streak).
+- `/habits/:habitId`: view stats, manage metrics, log an entry for a date (inputs are generated from the metrics), and review/delete recent entries. Works from phone via the LAN setup above.
+
+### Tests
+
+```bash
+cd backend && pip install -r requirements.txt -r requirements-dev.txt && python -m pytest
+```
+
 ## 🛣️ Roadmap
 
 ### Phase 1: Core Tracking
 - [x] Scaffold backend + frontend
-- [ ] Add CRUD for habits
-- [ ] Add metrics per habit
-- [ ] Add daily entries + metric values
-- [ ] Compute current + longest streak
+- [x] Add CRUD for habits (create/list/get)
+- [x] Add metrics per habit
+- [x] Add daily entries + metric values
+- [x] Compute current + longest streak
 
 ### Phase 2: Visualization
-- [ ] Habit list with streak cards
-- [ ] Habit detail page
+- [x] Habit list with streak summary
+- [x] Habit detail page
 - [ ] Contribution-style heatmap
 - [ ] Metric trend charts
 
