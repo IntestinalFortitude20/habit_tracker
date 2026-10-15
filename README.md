@@ -74,22 +74,29 @@ habit_tracker/
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
-# .venv\\Scripts\\activate   # Windows
+# .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend runs on `http://127.0.0.1:8000`
+Backend runs on `http://127.0.0.1:8000` (desktop) and `http://<your-lan-ip>:8000` (LAN devices)
 
 ### 2) Frontend
 
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev -- --host
 ```
 
-Frontend runs on `http://127.0.0.1:5173`
+Frontend runs on `http://localhost:5173` (desktop) and `http://<your-lan-ip>:5173` (LAN devices)
+
+### 3) LAN Test Checklist
+
+- Ensure phone + computer are on the same Wi-Fi network
+- Open backend health from phone: `http://<your-lan-ip>:8000/health`
+- Open frontend from phone: `http://<your-lan-ip>:5173`
+- If unreachable, allow inbound firewall access to ports `8000` and `5173`
 
 ## ✅ Current MVP Endpoints
 

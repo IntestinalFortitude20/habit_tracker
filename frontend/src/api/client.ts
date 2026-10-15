@@ -1,5 +1,7 @@
 import axios from "axios";
 
+const host = window.location.hostname;
+
 export const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: `http://${host}:8000`,
 });

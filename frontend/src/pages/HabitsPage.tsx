@@ -7,10 +7,17 @@ export function HabitsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const data = await fetchHabits();
-    setHabits(data);
+    setError(null);
+    try {
+      const data = await fetchHabits();
+      setHabits(data);
+    } catch (err) {
+      setError("Failed to load habits. Check backend connection and CORS settings.");
+      console.error(err);
+    }
   }
 
   useEffect(() => {
@@ -22,6 +29,7 @@ export function HabitsPage() {
     if (!name.trim()) return;
 
     setLoading(true);
+    setError(null);
     try {
       await createHabit({
         user_id: 1,
@@ -31,6 +39,9 @@ export function HabitsPage() {
       setName("");
       setDescription("");
       await load();
+    } catch (err) {
+      setError("Failed to create habit. Ensure backend is reachable at port 8000 from this device.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -40,6 +51,12 @@ export function HabitsPage() {
     <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
       <h1>Habit Tracker</h1>
       <p>Track your habits, streaks, and custom metrics.</p>
+
+      {error && (
+        <p style={{ color: "crimson", background: "#fff0f0", padding: "0.75rem", borderRadius: 8 }}>
+          {error}
+        </p>
+      )}
 
       <section style={{ marginTop: "1.5rem", marginBottom: "2rem" }}>
         <h2>Create habit</h2>
