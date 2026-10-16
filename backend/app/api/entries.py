@@ -49,10 +49,16 @@ def list_entries(
     habit_id: int,
     order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int | None = Query(None, ge=1, le=1000),
+    start: date | None = None,
+    end: date | None = None,
     db: Session = Depends(get_db),
 ):
     get_habit_or_404(db, habit_id)
     q = db.query(Entry).filter(Entry.habit_id == habit_id)
+    if start:
+        q = q.filter(Entry.date >= start)
+    if end:
+        q = q.filter(Entry.date <= end)
     q = q.order_by(Entry.date.asc() if order == "asc" else Entry.date.desc())
     if limit:
         q = q.limit(limit)

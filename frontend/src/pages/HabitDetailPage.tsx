@@ -1,130 +1,83 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { deleteEntry, fetchEntries, saveEntry } from "../api/entries";
+import { fetchEntriesInRange, fetchLatestEntry } from "../api/entries";
 import { fetchHabit } from "../api/habits";
-import { createMetric, deleteMetric, fetchMetrics, updateMetric } from "../api/metrics";
+import { fetchMetrics } from "../api/metrics";
 import { fetchStats } from "../api/stats";
+import { CalendarView } from "../components/CalendarView";
+import { DayDetailModal } from "../components/DayDetailModal";
+import { HeatmapView } from "../components/HeatmapView";
+import { LogEntryModal } from "../components/LogEntryModal";
+import { SettingsModal } from "../components/SettingsModal";
+import { addDays, toISO, todayISO } from "../dates";
 import type { Entry, HabitStats } from "../types/entry";
 import type { Habit } from "../types/habit";
-import type { Metric, MetricType } from "../types/metric";
+import type { Metric } from "../types/metric";
 
-const METRIC_TYPES: MetricType[] = ["boolean", "count", "duration", "rating"];
-const today = () => {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-};
-const card = { border: "1px solid #ddd", borderRadius: 8, padding: "0.75rem", minWidth: 110 };
+const card = { border: "1px solid #ddd", borderRadius: 8, padding: "0.75rem", minWidth: 110, flex: "1 1 110px" };
 
 export function HabitDetailPage() {
   const id = Number(useParams().habitId);
+  const now = new Date();
   const [habit, setHabit] = useState<Habit | null>(null);
   const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [entries, setEntries] = useState<Entry[]>([]);
   const [stats, setStats] = useState<HabitStats | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  const [mName, setMName] = useState("");
-  const [mType, setMType] = useState<MetricType>("count");
-  const [mUnit, setMUnit] = useState("");
+  const [view, setView] = useState<"calendar" | "heatmap">("calendar");
+  const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() });
+  const [monthEntries, setMonthEntries] = useState<Entry[]>([]);
+  const [latestDate, setLatestDate] = useState<string | null>(null);
+  const [heatEntries, setHeatEntries] = useState<Entry[]>([]);
 
-  const [date, setDate] = useState(today());
-  const [completed, setCompleted] = useState(true);
-  const [values, setValues] = useState<Record<number, string>>({});
-  const [saving, setSaving] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [logDate, setLogDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  const refreshEntries = useCallback(async () => {
-    const [e, s] = await Promise.all([fetchEntries(id), fetchStats(id)]);
-    setEntries(e);
+  const refresh = useCallback(async () => {
+    const monthStart = toISO(new Date(ym.year, ym.month, 1));
+    const monthEnd = toISO(new Date(ym.year, ym.month + 1, 0));
+    const [s, me, latest] = await Promise.all([
+      fetchStats(id),
+      fetchEntriesInRange(id, monthStart, monthEnd),
+      fetchLatestEntry(id),
+    ]);
     setStats(s);
-  }, [id]);
+    setMonthEntries(me);
+    setLatestDate(latest?.date ?? null);
+    setHeatEntries(latest ? await fetchEntriesInRange(id, addDays(latest.date, -29), latest.date) : []);
+  }, [id, ym]);
 
   const refreshMetrics = useCallback(async () => setMetrics(await fetchMetrics(id)), [id]);
 
   useEffect(() => {
     if (!Number.isFinite(id)) return;
-    Promise.all([fetchHabit(id), refreshMetrics(), refreshEntries()])
+    Promise.all([fetchHabit(id), refreshMetrics(), refresh()])
       .then(([h]) => setHabit(h))
       .catch((err) => {
         setError("Failed to load habit. Check that it exists and the backend is reachable.");
         console.error(err);
       });
-  }, [id, refreshMetrics, refreshEntries]);
+  }, [id, refreshMetrics, refresh]);
 
-  async function run(action: () => Promise<void>, failMsg: string, okMsg?: string) {
-    setError(null);
-    setSuccess(null);
-    try {
-      await action();
-      if (okMsg) setSuccess(okMsg);
-    } catch (err) {
-      setError(failMsg);
-      console.error(err);
-    }
-  }
-
-  function onAddMetric(e: React.FormEvent) {
-    e.preventDefault();
-    if (!mName.trim()) return;
-    void run(async () => {
-      await createMetric(id, { name: mName.trim(), type: mType, unit: mUnit.trim() || null });
-      setMName("");
-      setMUnit("");
-      await refreshMetrics();
-    }, "Failed to add metric.", "Metric added.");
-  }
-
-  function onEditMetric(m: Metric) {
-    const name = window.prompt("Metric name", m.name);
-    if (name === null || !name.trim()) return;
-    const unit = window.prompt("Unit (optional)", m.unit ?? "");
-    if (unit === null) return;
-    void run(async () => {
-      await updateMetric(id, m.id, { name: name.trim(), unit: unit.trim() || null });
-      await refreshMetrics();
-    }, "Failed to update metric.", "Metric updated.");
-  }
-
-  function onDeleteMetric(m: Metric) {
-    if (!window.confirm(`Delete metric "${m.name}" and its logged values?`)) return;
-    void run(async () => {
-      await deleteMetric(id, m.id);
-      await Promise.all([refreshMetrics(), refreshEntries()]);
-    }, "Failed to delete metric.", "Metric deleted.");
-  }
-
-  async function onLog(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    await run(async () => {
-      const metric_values = metrics
-        .filter((m) => values[m.id] !== undefined && values[m.id] !== "")
-        .map((m) => ({ metric_id: m.id, value: Number(values[m.id]) }))
-        .filter((v) => Number.isFinite(v.value));
-      await saveEntry(id, { date, completed, metric_values });
-      await refreshEntries();
-    }, "Failed to save entry.", `Entry saved for ${date}.`);
-    setSaving(false);
-  }
-
-  function onDeleteEntry(entry: Entry) {
-    void run(async () => {
-      await deleteEntry(id, entry.id);
-      await refreshEntries();
-    }, "Failed to delete entry.", "Entry deleted.");
-  }
-
-  const metricName = (mid: number) => metrics.find((m) => m.id === mid)?.name ?? `#${mid}`;
   const pct = (n: number) => `${Math.round(n * 100)}%`;
+  const findEntry = (d: string) =>
+    monthEntries.find((e) => e.date === d) ?? heatEntries.find((e) => e.date === d);
+  const showHeatmap = view === "heatmap" && latestDate !== null;
 
   return (
     <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
       <p><Link to="/habits">← All habits</Link></p>
-      <h1>{habit?.name ?? "Habit"}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+        <h1 style={{ margin: 0 }}>{habit?.name ?? "Habit"}</h1>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button onClick={() => setLogDate(todayISO())}>Log entry</button>
+          <button onClick={() => setShowSettings(true)}>⚙ Settings</button>
+        </div>
+      </div>
       {habit?.description && <p>{habit.description}</p>}
 
       {error && <p style={{ color: "crimson", background: "#fff0f0", padding: "0.75rem", borderRadius: 8 }}>{error}</p>}
-      {success && <p style={{ color: "#146c2e", background: "#effaf1", padding: "0.75rem", borderRadius: 8 }}>{success}</p>}
 
       <section>
         <h2>Stats</h2>
@@ -137,73 +90,54 @@ export function HabitDetailPage() {
       </section>
 
       <section>
-        <h2>Metrics</h2>
-        <form onSubmit={onAddMetric} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <input placeholder="Name (e.g. Reps)" value={mName} onChange={(e) => setMName(e.target.value)} />
-          <select value={mType} onChange={(e) => setMType(e.target.value as MetricType)}>
-            {METRIC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <input placeholder="Unit (optional)" value={mUnit} onChange={(e) => setMUnit(e.target.value)} />
-          <button type="submit">Add metric</button>
-        </form>
-        {metrics.length === 0 ? <p>No metrics yet.</p> : (
-          <ul>
-            {metrics.map((m) => (
-              <li key={m.id}>
-                <strong>{m.name}</strong> ({m.type}{m.unit ? `, ${m.unit}` : ""}){" "}
-                <button onClick={() => onEditMetric(m)}>Edit</button>{" "}
-                <button onClick={() => onDeleteMetric(m)}>Delete</button>
-              </li>
-            ))}
-          </ul>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2>Dates</h2>
+          {latestDate && (
+            <button onClick={() => setView(view === "calendar" ? "heatmap" : "calendar")}>
+              {view === "calendar" ? "Show heatmap" : "Show calendar"}
+            </button>
+          )}
+        </div>
+        {showHeatmap ? (
+          <HeatmapView end={latestDate} entries={heatEntries} metrics={metrics} onSelect={setSelectedDate} />
+        ) : (
+          <CalendarView
+            year={ym.year}
+            month={ym.month}
+            entries={monthEntries}
+            onChangeMonth={(year, month) => setYm({ year, month })}
+            onSelect={setSelectedDate}
+          />
         )}
+        {!latestDate && <p><small>No entries yet. Log one to unlock the heatmap.</small></p>}
       </section>
 
-      <section>
-        <h2>Log entry</h2>
-        <form onSubmit={onLog} style={{ display: "grid", gap: "0.5rem", maxWidth: 420 }}>
-          <label>Date <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
-          <label><input type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)} /> Completed</label>
-          {metrics.map((m) => (
-            <label key={m.id}>
-              {m.name}{m.unit ? ` (${m.unit})` : ""}{" "}
-              {m.type === "boolean" ? (
-                <select value={values[m.id] ?? ""} onChange={(e) => setValues({ ...values, [m.id]: e.target.value })}>
-                  <option value="">–</option>
-                  <option value="1">Yes</option>
-                  <option value="0">No</option>
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  step="any"
-                  min={m.type === "rating" ? 1 : 0}
-                  max={m.type === "rating" ? 5 : undefined}
-                  value={values[m.id] ?? ""}
-                  onChange={(e) => setValues({ ...values, [m.id]: e.target.value })}
-                />
-              )}
-            </label>
-          ))}
-          <button disabled={saving} type="submit">{saving ? "Saving..." : "Save entry"}</button>
-        </form>
-        <p><small>Saving a date that already has an entry replaces it.</small></p>
-      </section>
-
-      <section>
-        <h2>Recent entries</h2>
-        {entries.length === 0 ? <p>No entries yet.</p> : (
-          <ul>
-            {entries.map((en) => (
-              <li key={en.id}>
-                {en.date} — {en.completed ? "✅ done" : "❌ not done"}
-                {en.metric_values.map((v) => `, ${metricName(v.metric_id)}: ${v.value}`).join("")}{" "}
-                <button onClick={() => onDeleteEntry(en)}>Delete</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {showSettings && (
+        <SettingsModal
+          habitId={id}
+          metrics={metrics}
+          onClose={() => setShowSettings(false)}
+          onChanged={async () => { await Promise.all([refreshMetrics(), refresh()]); }}
+        />
+      )}
+      {logDate && (
+        <LogEntryModal
+          habitId={id}
+          metrics={metrics}
+          initialDate={logDate}
+          onClose={() => setLogDate(null)}
+          onSaved={refresh}
+        />
+      )}
+      {selectedDate && !logDate && (
+        <DayDetailModal
+          date={selectedDate}
+          entry={findEntry(selectedDate)}
+          metrics={metrics}
+          onClose={() => setSelectedDate(null)}
+          onEdit={() => { setLogDate(selectedDate); setSelectedDate(null); }}
+        />
+      )}
     </main>
   );
 }
