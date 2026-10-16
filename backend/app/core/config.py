@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     database_url: str = "sqlite:///./habit_tracker.db"
     cors_origins: list[str] = ["http://localhost:5173"]
+    llm_api_key: str | None = None
+    llm_model: str = "gpt-4o-mini"
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_timeout_seconds: float = 30.0
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

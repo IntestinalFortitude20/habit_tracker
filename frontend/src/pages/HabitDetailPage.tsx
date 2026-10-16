@@ -5,6 +5,7 @@ import { fetchHabit } from "../api/habits";
 import { fetchMetrics } from "../api/metrics";
 import { fetchStats } from "../api/stats";
 import { Button } from "../components/Button";
+import { ChatModal } from "../components/ChatModal";
 import { Card } from "../components/Card";
 import { CalendarView } from "../components/CalendarView";
 import { DayDetailModal } from "../components/DayDetailModal";
@@ -31,6 +32,7 @@ export function HabitDetailPage() {
   const [heatEntries, setHeatEntries] = useState<Entry[]>([]);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [logDate, setLogDate] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -79,6 +81,7 @@ export function HabitDetailPage() {
         <div className="actions">
           <Button variant="primary" onClick={() => setLogDate(todayISO())}>Log entry</Button>
           <Button onClick={() => setShowSettings(true)}>⚙ Settings</Button>
+          <Button onClick={() => setShowChat(true)}>💬 Ask AI</Button>
         </div>
         {latestDate && (
           <Button onClick={() => setView(view === "calendar" ? "heatmap" : "calendar")}>
@@ -116,6 +119,7 @@ export function HabitDetailPage() {
         </Card>
       </section>
 
+      {showChat && <ChatModal habitId={id} habitName={habit?.name} onClose={() => setShowChat(false)} />}
       {showSettings && (
         <SettingsModal
           habitId={id}

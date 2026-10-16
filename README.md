@@ -91,7 +91,24 @@ npm run dev -- --host
 
 Frontend runs on `http://localhost:5173` (desktop) and `http://<your-lan-ip>:5173` (LAN devices)
 
-### 3) LAN Test Checklist
+### 3) AI chat setup
+
+The AI coach calls an OpenAI-compatible chat completions API **from the backend only**; the key is never sent to the browser.
+
+1. Get an API key from your provider (e.g. https://platform.openai.com/api-keys).
+2. `cp backend/.env.example backend/.env` and edit it (`.env` is git-ignored — never commit it):
+   - `LLM_API_KEY` – your key (required)
+   - `LLM_MODEL` – model name (default `gpt-4o-mini`)
+   - `LLM_BASE_URL` – optional, for other OpenAI-compatible providers (default `https://api.openai.com/v1`)
+3. Restart the backend (`.env` is read at startup).
+
+Without a key, `POST /api/chat` returns `503` with a setup hint. Upstream errors map to `502`, timeouts to `504`.
+
+Using the chat: tap **💬 Ask AI** on a habit page (scoped to that habit's metrics, stats and last 30 days of entries) or on the home page (general chat across all habits). Enter sends, Shift+Enter adds a newline; history lives only in the open panel.
+
+**Mobile modals:** modals no longer autofocus inputs (so the keyboard only opens when you tap a field), sit toward the top on small screens, resize with the visual viewport, and scroll the focused field into view.
+
+### 4) LAN Test Checklist
 
 - Ensure phone + computer are on the same Wi-Fi network
 - Open backend health from phone: `http://<your-lan-ip>:8000/health`
@@ -155,8 +172,8 @@ cd backend && pip install -r requirements.txt -r requirements-dev.txt && python 
 - [ ] Metric trend charts
 
 ### Phase 3: AI Assistant
-- [ ] `POST /api/chat` endpoint
-- [ ] Context injection (habit summaries)
+- [x] `POST /api/chat` endpoint
+- [x] Context injection (habit summaries)
 - [ ] Tool-calling for logging/update actions
 
 ### Phase 4: ML Features

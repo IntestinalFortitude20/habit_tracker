@@ -3,6 +3,8 @@ import { fetchStats } from "../api/stats";
 import { fetchHabits } from "../api/habits";
 import { LinkCard } from "../components/Card";
 import { CreateHabitModal } from "../components/CreateHabitModal";
+import { Button } from "../components/Button";
+import { ChatModal } from "../components/ChatModal";
 import { Fab } from "../components/Fab";
 import type { HabitStats } from "../types/entry";
 import type { Habit } from "../types/habit";
@@ -11,6 +13,7 @@ export function HabitsPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [streaks, setStreaks] = useState<Record<number, HabitStats>>({});
   const [showCreate, setShowCreate] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,9 +46,12 @@ export function HabitsPage() {
 
   return (
     <main className="page stack">
-      <header>
-        <h1>Habit Tracker</h1>
-        <p className="muted">Track your habits, streaks, and custom metrics.</p>
+      <header className="row">
+        <div>
+          <h1>Habit Tracker</h1>
+          <p className="muted">Track your habits, streaks, and custom metrics.</p>
+        </div>
+        <Button onClick={() => setShowChat(true)} aria-label="Ask AI coach">💬 Ask AI</Button>
       </header>
 
       {error && <p className="alert alert--error" role="alert">{error}</p>}
@@ -79,6 +85,7 @@ export function HabitsPage() {
           }}
         />
       )}
+      {showChat && <ChatModal habitId={null} onClose={() => setShowChat(false)} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </main>
   );

@@ -16,7 +16,26 @@ export function Modal({ title, onClose, children, footer }: Props) {
     const focusable = () =>
       Array.from(node?.querySelectorAll<HTMLElement>('input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])') ?? [])
         .filter((el) => !(el as HTMLButtonElement).disabled);
-    (node?.querySelector<HTMLElement>("input, select, textarea") ?? node)?.focus();
+    // Focus the dialog itself (not a field) so touch devices don't pop the keyboard open.
+    node?.focus();
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t !== node && t.matches("input, select, textarea")) {
+        window.setTimeout(() => t.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+      }
+    };
+    node?.addEventListener("focusin", onFocusIn);
+    const vv = window.visualViewport;
+    const onViewport = () => {
+      if (!vv) return;
+      document.documentElement.style.setProperty("--vvh", `${vv.height}px`);
+      const active = document.activeElement as HTMLElement | null;
+      if (active && node?.contains(active) && active.matches("input, select, textarea")) {
+        active.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    };
+    onViewport();
+    vv?.addEventListener("resize", onViewport);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { closeRef.current(); return; }
       if (e.key !== "Tab") return;
@@ -29,6 +48,9 @@ export function Modal({ title, onClose, children, footer }: Props) {
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
+      node?.removeEventListener("focusin", onFocusIn);
+      vv?.removeEventListener("resize", onViewport);
+      document.documentElement.style.removeProperty("--vvh");
       previous?.focus?.();
     };
   }, []);
