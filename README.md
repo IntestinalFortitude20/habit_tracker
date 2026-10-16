@@ -116,7 +116,7 @@ Frontend runs on `http://localhost:5173` (desktop) and `http://<your-lan-ip>:517
 | --- | --- | --- |
 | POST/GET | `/api/habits/{id}/metrics` | create / list |
 | GET/PUT/DELETE | `/api/habits/{id}/metrics/{metric_id}` | |
-| POST/GET | `/api/habits/{id}/entries` | POST **upserts** by date; GET supports `order=asc\|desc`, `limit` |
+| POST/GET | `/api/habits/{id}/entries` | POST **upserts** by date; GET supports `order=asc\|desc`, `limit`, `start`, `end` (inclusive `YYYY-MM-DD` date range) |
 | GET/PUT/DELETE | `/api/habits/{id}/entries/{entry_id}` | |
 | GET | `/api/habits/{id}/stats` | streaks, rates, totals |
 
@@ -127,7 +127,11 @@ Rates = completed days in the trailing 7/30 days (incl. today) divided by 7/30. 
 ### Using the screens
 
 - `/habits`: create habits; click one to open it (shows its current streak).
-- `/habits/:habitId`: view stats, manage metrics, log an entry for a date (inputs are generated from the metrics), and review/delete recent entries. Works from phone via the LAN setup above.
+- `/habits/:habitId`: calendar-first habit page showing streak/stat cards (current, longest, 7d/30d rates) and the date view, with two actions: **Log entry** and **⚙ Settings**. Works from phone via the LAN setup above.
+  - **Calendar** (default): month grid, navigable with ‹ ›. Click a day to see its completed status and metric values; **Edit entry** opens the Log entry modal prefilled for that date.
+  - **Settings modal**: list, add (name, type, unit), edit (name, unit) and delete metrics.
+  - **Log entry modal**: date picker (defaults to today), completed toggle and one input per metric. Picking a date that already has an entry prefills it and saving updates it. Stats and date views refresh after saving; success/error messages are shown in the modal.
+  - **Heatmap**: a "Show heatmap" toggle appears only once the habit has at least one entry. It always covers 30 days inclusive, ending at the latest entry date (`start = end - 29 days`); days without entries (including days before the first entry) are neutral gray. Contribution days use 3 green intensity levels, based on the first `count` metric if one exists, otherwise on the completed flag. Clicking a day opens the same day details/edit flow.
 
 ### Tests
 

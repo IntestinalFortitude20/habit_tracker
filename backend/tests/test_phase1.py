@@ -58,3 +58,13 @@ def test_api_flow():
         assert c.get(f"/api/habits/{h}/stats").json()["current_streak"] == 1
         assert c.delete(f"/api/habits/{h}/metrics/{m}").status_code == 204
         assert c.delete(f"/api/habits/{h}/entries/{ok.json()['id']}").status_code == 204
+
+
+def test_entries_date_range():
+    with TestClient(app) as c:
+        h = c.post("/api/habits", json={"user_id": 1, "name": "range"}).json()["id"]
+        for d in ("2024-01-01", "2024-01-15", "2024-02-01"):
+            c.post(f"/api/habits/{h}/entries", json={"date": d, "completed": True, "metric_values": []})
+        r = c.get(f"/api/habits/{h}/entries?start=2024-01-01&end=2024-01-31&order=asc").json()
+        assert [e["date"] for e in r] == ["2024-01-01", "2024-01-15"]
+        assert len(c.get(f"/api/habits/{h}/entries?start=2024-01-10").json()) == 2
