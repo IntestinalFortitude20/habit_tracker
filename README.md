@@ -104,7 +104,7 @@ The AI coach calls an OpenAI-compatible chat completions API **from the backend 
 
 Without a key, `POST /api/chat` returns `503` with a setup hint. Upstream errors map to `502`, timeouts to `504`.
 
-Using the chat: tap **💬 Ask AI** on a habit page (scoped to that habit's metrics, stats and last 30 days of entries) or on the home page (general chat across all habits). Enter sends, Shift+Enter adds a newline; history lives only in the open panel.
+Using the chat: tap the floating **chat bubble button** (bottom-right, "Open AI coach chat") on a habit page (scoped to that habit's metrics, stats and last 30 days of entries) or on the home page (general chat across all habits). Enter sends, Shift+Enter adds a newline; history lives only in the open panel.
 
 **Mobile modals:** modals no longer autofocus inputs (so the keyboard only opens when you tap a field), sit toward the top on small screens, resize with the visual viewport, and scroll the focused field into view.
 

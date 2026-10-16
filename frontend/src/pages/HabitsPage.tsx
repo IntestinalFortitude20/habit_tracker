@@ -3,9 +3,8 @@ import { fetchStats } from "../api/stats";
 import { fetchHabits } from "../api/habits";
 import { LinkCard } from "../components/Card";
 import { CreateHabitModal } from "../components/CreateHabitModal";
-import { Button } from "../components/Button";
 import { ChatModal } from "../components/ChatModal";
-import { Fab } from "../components/Fab";
+import { ChatFab, Fab } from "../components/Fab";
 import type { HabitStats } from "../types/entry";
 import type { Habit } from "../types/habit";
 
@@ -45,13 +44,10 @@ export function HabitsPage() {
   }, [toast]);
 
   return (
-    <main className="page stack">
-      <header className="row">
-        <div>
-          <h1>Habit Tracker</h1>
-          <p className="muted">Track your habits, streaks, and custom metrics.</p>
-        </div>
-        <Button onClick={() => setShowChat(true)} aria-label="Ask AI coach">💬 Ask AI</Button>
+    <main className="page page--fabs stack">
+      <header>
+        <h1>Habit Tracker</h1>
+        <p className="muted">Track your habits, streaks, and custom metrics.</p>
       </header>
 
       {error && <p className="alert alert--error" role="alert">{error}</p>}
@@ -75,6 +71,7 @@ export function HabitsPage() {
         )}
       </section>
 
+      {!showCreate && !showChat && <ChatFab stacked onClick={() => setShowChat(true)} />}
       <Fab label="Create habit" onClick={() => setShowCreate(true)} />
       {showCreate && (
         <CreateHabitModal

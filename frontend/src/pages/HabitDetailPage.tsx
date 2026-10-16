@@ -5,6 +5,7 @@ import { fetchHabit } from "../api/habits";
 import { fetchMetrics } from "../api/metrics";
 import { fetchStats } from "../api/stats";
 import { Button } from "../components/Button";
+import { ChatFab } from "../components/Fab";
 import { ChatModal } from "../components/ChatModal";
 import { Card } from "../components/Card";
 import { CalendarView } from "../components/CalendarView";
@@ -81,7 +82,6 @@ export function HabitDetailPage() {
         <div className="actions">
           <Button variant="primary" onClick={() => setLogDate(todayISO())}>Log entry</Button>
           <Button onClick={() => setShowSettings(true)}>⚙ Settings</Button>
-          <Button onClick={() => setShowChat(true)}>💬 Ask AI</Button>
         </div>
         {latestDate && (
           <Button onClick={() => setView(view === "calendar" ? "heatmap" : "calendar")}>
@@ -119,6 +119,7 @@ export function HabitDetailPage() {
         </Card>
       </section>
 
+      {!showChat && !showSettings && !logDate && !selectedDate && <ChatFab onClick={() => setShowChat(true)} />}
       {showChat && <ChatModal habitId={id} habitName={habit?.name} onClose={() => setShowChat(false)} />}
       {showSettings && (
         <SettingsModal
