@@ -3,10 +3,10 @@ import type { Metric } from "../types/metric";
 import { addDays } from "../dates";
 import { intensityLevel, LEVEL_COLORS, maxCountValue } from "./intensity";
 
-type Props = { end: string; entries: Entry[]; metrics: Metric[]; onSelect: (date: string) => void };
+type Props = { end: string; selected?: string | null; entries: Entry[]; metrics: Metric[]; onSelect: (date: string) => void };
 
 // Fixed 30-day window (inclusive) ending at `end`; days without entries render gray.
-export function HeatmapView({ end, entries, metrics, onSelect }: Props) {
+export function HeatmapView({ end, entries, metrics, selected, onSelect }: Props) {
   const start = addDays(end, -29);
   const byDate = new Map(entries.map((e) => [e.date, e]));
   const max = maxCountValue(entries, metrics);
@@ -15,23 +15,28 @@ export function HeatmapView({ end, entries, metrics, onSelect }: Props) {
   return (
     <div>
       <p style={{ margin: "0 0 0.5rem" }}><small>{start} → {end}</small></p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(10, minmax(0, 1fr))", gap: 4, maxWidth: 420 }}>
+      <div className="heat-grid">
         {days.map((d) => {
           const en = byDate.get(d);
           return (
             <button
               key={d}
+              type="button"
               onClick={() => onSelect(d)}
               title={d}
               aria-label={d}
-              style={{
-                aspectRatio: "1", padding: 0, border: "none", borderRadius: 3, cursor: "pointer",
-                background: LEVEL_COLORS[intensityLevel(en, metrics, max)],
-              }}
+              aria-pressed={d === selected}
+              className={`heat-cell${d === selected ? " heat-cell--selected" : ""}`}
+              style={{ background: LEVEL_COLORS[intensityLevel(en, metrics, max)] }}
             />
           );
         })}
       </div>
+      <p className="legend">
+        Less
+        {LEVEL_COLORS.map((c, i) => <span key={i} className="swatch" style={{ background: c }} />)}
+        More
+      </p>
     </div>
   );
 }
