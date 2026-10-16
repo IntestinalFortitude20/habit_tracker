@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { fetchStats } from "../api/stats";
 import { createHabit, fetchHabits } from "../api/habits";
+import type { HabitStats } from "../types/entry";
 import type { Habit } from "../types/habit";
 
 export function HabitsPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [streaks, setStreaks] = useState<Record<number, HabitStats>>({});
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,6 +18,12 @@ export function HabitsPage() {
     try {
       const data = await fetchHabits();
       setHabits(data);
+      const results = await Promise.allSettled(data.map((h) => fetchStats(h.id)));
+      const next: Record<number, HabitStats> = {};
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") next[data[i].id] = r.value;
+      });
+      setStreaks(next);
     } catch (err) {
       setError("Failed to load habits. Check backend connection and CORS settings.");
       console.error(err);
@@ -85,8 +95,9 @@ export function HabitsPage() {
           <ul>
             {habits.map((habit) => (
               <li key={habit.id}>
-                <strong>{habit.name}</strong>
+                <Link to={`/habits/${habit.id}`}><strong>{habit.name}</strong></Link>
                 {habit.description ? ` — ${habit.description}` : ""}
+                {streaks[habit.id] ? ` 🔥 ${streaks[habit.id].current_streak}-day streak` : ""}
               </li>
             ))}
           </ul>

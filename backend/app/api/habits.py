@@ -8,6 +8,13 @@ from app.schemas.habit import HabitCreate, HabitRead
 router = APIRouter(prefix="/api/habits", tags=["habits"])
 
 
+def get_habit_or_404(db: Session, habit_id: int) -> Habit:
+    habit = db.query(Habit).filter(Habit.id == habit_id).first()
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    return habit
+
+
 @router.post("", response_model=HabitRead, status_code=status.HTTP_201_CREATED)
 def create_habit(payload: HabitCreate, db: Session = Depends(get_db)):
     habit = Habit(**payload.model_dump())
@@ -24,7 +31,4 @@ def list_habits(db: Session = Depends(get_db)):
 
 @router.get("/{habit_id}", response_model=HabitRead)
 def get_habit(habit_id: int, db: Session = Depends(get_db)):
-    habit = db.query(Habit).filter(Habit.id == habit_id).first()
-    if not habit:
-        raise HTTPException(status_code=404, detail="Habit not found")
-    return habit
+    return get_habit_or_404(db, habit_id)
