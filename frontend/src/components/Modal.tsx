@@ -1,29 +1,55 @@
+import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
+import { Button } from "./Button";
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+type Props = { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode };
+
+export function Modal({ title, onClose, children, footer }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const node = ref.current;
+    const focusable = () =>
+      Array.from(node?.querySelectorAll<HTMLElement>('input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])') ?? [])
+        .filter((el) => !(el as HTMLButtonElement).disabled);
+    (node?.querySelector<HTMLElement>("input, select, textarea") ?? node)?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { closeRef.current(); return; }
+      if (e.key !== "Tab") return;
+      const els = focusable();
+      if (els.length === 0) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === node)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      previous?.focus?.();
+    };
+  }, []);
+
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex",
-        alignItems: "center", justifyContent: "center", padding: "0.5rem", zIndex: 10,
-      }}
-    >
+    <div className="modal-backdrop" onClick={onClose}>
       <div
+        ref={ref}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff", borderRadius: 8, padding: "1rem", width: "100%", maxWidth: 480,
-          maxHeight: "90vh", overflowY: "auto", boxSizing: "border-box",
-        }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ margin: 0 }}>{title}</h2>
-          <button onClick={onClose} aria-label="Close">✕</button>
+        <div className="modal__header">
+          <h2 className="modal__title" id={titleId}>{title}</h2>
+          <Button icon onClick={onClose} aria-label="Close">✕</Button>
         </div>
-        {children}
+        <div className="modal__body">{children}</div>
+        {footer && <div className="modal__footer">{footer}</div>}
       </div>
     </div>
   );

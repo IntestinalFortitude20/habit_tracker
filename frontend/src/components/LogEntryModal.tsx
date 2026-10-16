@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchEntriesInRange, saveEntry } from "../api/entries";
 import type { Metric } from "../types/metric";
+import { Button } from "./Button";
 import { Modal } from "./Modal";
 
 type Props = {
@@ -60,23 +61,35 @@ export function LogEntryModal({ habitId, metrics, initialDate, onClose, onSaved 
   }
 
   return (
-    <Modal title="Log entry" onClose={onClose}>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      {success && <p style={{ color: "#146c2e" }}>{success}</p>}
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.5rem" }}>
-        <label>Date <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
-        <label><input type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)} /> Completed</label>
+    <Modal
+      title="Log entry"
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>Close</Button>
+          <Button variant="primary" type="submit" form="log-entry-form" loading={saving}>
+            {saving ? "Saving..." : existing ? "Update entry" : "Save entry"}
+          </Button>
+        </>
+      }
+    >
+      {error && <p className="alert alert--error" role="alert">{error}</p>}
+      {success && <p className="alert alert--success" role="status">{success}</p>}
+      <form id="log-entry-form" onSubmit={onSubmit}>
+        <label className="field">Date <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
+        <label className="field field--check"><input type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)} /> Completed</label>
         {metrics.map((m) => (
-          <label key={m.id}>
-            {m.name}{m.unit ? ` (${m.unit})` : ""}{" "}
+          <label key={m.id} className="field">
+            {m.name}{m.unit ? ` (${m.unit})` : ""}
             {m.type === "boolean" ? (
-              <select value={values[m.id] ?? ""} onChange={(e) => setValues({ ...values, [m.id]: e.target.value })}>
+              <select className="input" value={values[m.id] ?? ""} onChange={(e) => setValues({ ...values, [m.id]: e.target.value })}>
                 <option value="">–</option>
                 <option value="1">Yes</option>
                 <option value="0">No</option>
               </select>
             ) : (
               <input
+                className="input"
                 type="number"
                 step="any"
                 min={m.type === "rating" ? 1 : 0}
@@ -87,9 +100,8 @@ export function LogEntryModal({ habitId, metrics, initialDate, onClose, onSaved 
             )}
           </label>
         ))}
-        <button disabled={saving} type="submit">{saving ? "Saving..." : existing ? "Update entry" : "Save entry"}</button>
       </form>
-      {existing && <p><small>This date already has an entry; saving replaces it.</small></p>}
+      {existing && <p className="muted"><small>This date already has an entry; saving replaces it.</small></p>}
     </Modal>
   );
 }

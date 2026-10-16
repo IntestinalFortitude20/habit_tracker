@@ -126,7 +126,7 @@ Rates = completed days in the trailing 7/30 days (incl. today) divided by 7/30. 
 
 ### Using the screens
 
-- `/habits`: create habits; click one to open it (shows its current streak).
+- `/habits`: habits are shown as a responsive grid of cards (title, description, current streak); click a card to open it. A floating "+" button (bottom-right) opens a modal to create a habit (name required, description optional). Empty state points to the button. Shared styling lives in `frontend/src/styles.css` (design tokens) with reusable `Button`, `Card`, `Fab` and `Modal` components; modals close via ESC, backdrop or the close button.
 - `/habits/:habitId`: calendar-first habit page showing streak/stat cards (current, longest, 7d/30d rates) and the date view, with two actions: **Log entry** and **⚙ Settings**. Works from phone via the LAN setup above.
   - **Calendar** (default): month grid, navigable with ‹ ›. Click a day to see its completed status and metric values; **Edit entry** opens the Log entry modal prefilled for that date.
   - **Settings modal**: list, add (name, type, unit), edit (name, unit) and delete metrics.

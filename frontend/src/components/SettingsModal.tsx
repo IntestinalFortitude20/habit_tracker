@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createMetric, deleteMetric, updateMetric } from "../api/metrics";
 import type { Metric, MetricType } from "../types/metric";
+import { Button } from "./Button";
 import { Modal } from "./Modal";
 
 const METRIC_TYPES: MetricType[] = ["boolean", "count", "duration", "rating"];
@@ -61,39 +62,41 @@ export function SettingsModal({ habitId, metrics, onClose, onChanged }: Props) {
 
   return (
     <Modal title="Settings" onClose={onClose}>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      {success && <p style={{ color: "#146c2e" }}>{success}</p>}
-      <h3>Metrics</h3>
-      {metrics.length === 0 ? <p>No metrics yet.</p> : (
-        <ul style={{ paddingLeft: "1.25rem" }}>
+      {error && <p className="alert alert--error" role="alert">{error}</p>}
+      {success && <p className="alert alert--success" role="status">{success}</p>}
+      <h3 style={{ marginTop: 0 }}>Metrics</h3>
+      {metrics.length === 0 ? <p className="empty">No metrics yet.</p> : (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
           {metrics.map((m) => (
-            <li key={m.id} style={{ marginBottom: "0.5rem" }}>
+            <li key={m.id} className="card">
               {editing === m.id ? (
-                <span style={{ display: "inline-flex", gap: "0.25rem", flexWrap: "wrap" }}>
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} />
-                  <input placeholder="Unit" value={editUnit} onChange={(e) => setEditUnit(e.target.value)} />
-                  <button onClick={() => saveEdit(m)}>Save</button>
-                  <button onClick={() => setEditing(null)}>Cancel</button>
-                </span>
+                <div className="form-row">
+                  <input className="input" aria-label="Metric name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  <input className="input" aria-label="Unit" placeholder="Unit" value={editUnit} onChange={(e) => setEditUnit(e.target.value)} />
+                  <Button variant="primary" onClick={() => saveEdit(m)}>Save</Button>
+                  <Button onClick={() => setEditing(null)}>Cancel</Button>
+                </div>
               ) : (
-                <>
-                  <strong>{m.name}</strong> ({m.type}{m.unit ? `, ${m.unit}` : ""}){" "}
-                  <button onClick={() => startEdit(m)}>Edit</button>{" "}
-                  <button onClick={() => onDelete(m)}>Delete</button>
-                </>
+                <div className="row">
+                  <span><strong>{m.name}</strong> <small>({m.type}{m.unit ? `, ${m.unit}` : ""})</small></span>
+                  <span className="actions">
+                    <Button onClick={() => startEdit(m)}>Edit</Button>
+                    <Button variant="danger" onClick={() => onDelete(m)}>Delete</Button>
+                  </span>
+                </div>
               )}
             </li>
           ))}
         </ul>
       )}
       <h3>Add metric</h3>
-      <form onSubmit={onAdd} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <input placeholder="Name (e.g. Reps)" value={name} onChange={(e) => setName(e.target.value)} />
-        <select value={type} onChange={(e) => setType(e.target.value as MetricType)}>
+      <form onSubmit={onAdd} className="form-row">
+        <input className="input" aria-label="Metric name" placeholder="Name (e.g. Reps)" value={name} onChange={(e) => setName(e.target.value)} />
+        <select className="input" aria-label="Metric type" value={type} onChange={(e) => setType(e.target.value as MetricType)}>
           {METRIC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <input placeholder="Unit (optional)" value={unit} onChange={(e) => setUnit(e.target.value)} />
-        <button type="submit">Add metric</button>
+        <input className="input" aria-label="Unit" placeholder="Unit (optional)" value={unit} onChange={(e) => setUnit(e.target.value)} />
+        <Button variant="primary" type="submit">Add metric</Button>
       </form>
     </Modal>
   );

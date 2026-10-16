@@ -4,6 +4,8 @@ import { fetchEntriesInRange, fetchLatestEntry } from "../api/entries";
 import { fetchHabit } from "../api/habits";
 import { fetchMetrics } from "../api/metrics";
 import { fetchStats } from "../api/stats";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
 import { CalendarView } from "../components/CalendarView";
 import { DayDetailModal } from "../components/DayDetailModal";
 import { HeatmapView } from "../components/HeatmapView";
@@ -13,8 +15,6 @@ import { addDays, toISO, todayISO } from "../dates";
 import type { Entry, HabitStats } from "../types/entry";
 import type { Habit } from "../types/habit";
 import type { Metric } from "../types/metric";
-
-const card = { border: "1px solid #ddd", borderRadius: 8, padding: "0.75rem", minWidth: 110, flex: "1 1 110px" };
 
 export function HabitDetailPage() {
   const id = Number(useParams().habitId);
@@ -66,50 +66,54 @@ export function HabitDetailPage() {
   const showHeatmap = view === "heatmap" && latestDate !== null;
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
-      <p><Link to="/habits">← All habits</Link></p>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-        <h1 style={{ margin: 0 }}>{habit?.name ?? "Habit"}</h1>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button onClick={() => setLogDate(todayISO())}>Log entry</button>
-          <button onClick={() => setShowSettings(true)}>⚙ Settings</button>
-        </div>
+    <main className="page stack">
+      <div>
+        <Link to="/habits" className="back-link">← All habits</Link>
+        <h1>{habit?.name ?? "Habit"}</h1>
+        {habit?.description && <p className="muted">{habit.description}</p>}
       </div>
-      {habit?.description && <p>{habit.description}</p>}
 
-      {error && <p style={{ color: "crimson", background: "#fff0f0", padding: "0.75rem", borderRadius: 8 }}>{error}</p>}
+      {error && <p className="alert alert--error" role="alert">{error}</p>}
+
+      <div className="row">
+        <div className="actions">
+          <Button variant="primary" onClick={() => setLogDate(todayISO())}>Log entry</Button>
+          <Button onClick={() => setShowSettings(true)}>⚙ Settings</Button>
+        </div>
+        {latestDate && (
+          <Button onClick={() => setView(view === "calendar" ? "heatmap" : "calendar")}>
+            {view === "calendar" ? "Show heatmap" : "Show calendar"}
+          </Button>
+        )}
+      </div>
 
       <section>
         <h2>Stats</h2>
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <div style={card}><small>Current streak</small><h3>{stats?.current_streak ?? "–"}</h3></div>
-          <div style={card}><small>Longest streak</small><h3>{stats?.longest_streak ?? "–"}</h3></div>
-          <div style={card}><small>Last 7 days</small><h3>{stats ? pct(stats.completion_rate_7d) : "–"}</h3></div>
-          <div style={card}><small>Last 30 days</small><h3>{stats ? pct(stats.completion_rate_30d) : "–"}</h3></div>
+        <div className="stat-grid">
+          <Card className="stat"><small>Current streak</small><p className="stat__value">{stats?.current_streak ?? "–"}</p></Card>
+          <Card className="stat"><small>Longest streak</small><p className="stat__value">{stats?.longest_streak ?? "–"}</p></Card>
+          <Card className="stat"><small>Last 7 days</small><p className="stat__value">{stats ? pct(stats.completion_rate_7d) : "–"}</p></Card>
+          <Card className="stat"><small>Last 30 days</small><p className="stat__value">{stats ? pct(stats.completion_rate_30d) : "–"}</p></Card>
         </div>
       </section>
 
       <section>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2>Dates</h2>
-          {latestDate && (
-            <button onClick={() => setView(view === "calendar" ? "heatmap" : "calendar")}>
-              {view === "calendar" ? "Show heatmap" : "Show calendar"}
-            </button>
+        <h2>Dates</h2>
+        <Card>
+          {showHeatmap ? (
+            <HeatmapView end={latestDate} entries={heatEntries} metrics={metrics} selected={selectedDate} onSelect={setSelectedDate} />
+          ) : (
+            <CalendarView
+              year={ym.year}
+              month={ym.month}
+              entries={monthEntries}
+              selected={selectedDate}
+              onChangeMonth={(year, month) => setYm({ year, month })}
+              onSelect={setSelectedDate}
+            />
           )}
-        </div>
-        {showHeatmap ? (
-          <HeatmapView end={latestDate} entries={heatEntries} metrics={metrics} onSelect={setSelectedDate} />
-        ) : (
-          <CalendarView
-            year={ym.year}
-            month={ym.month}
-            entries={monthEntries}
-            onChangeMonth={(year, month) => setYm({ year, month })}
-            onSelect={setSelectedDate}
-          />
-        )}
-        {!latestDate && <p><small>No entries yet. Log one to unlock the heatmap.</small></p>}
+          {!latestDate && <p className="empty" style={{ marginTop: "1rem" }}>No entries yet. Log one to unlock the heatmap.</p>}
+        </Card>
       </section>
 
       {showSettings && (

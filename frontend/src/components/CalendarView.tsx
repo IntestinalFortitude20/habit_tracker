@@ -1,17 +1,19 @@
 import type { Entry } from "../types/entry";
+import { Button } from "./Button";
 import { toISO, todayISO } from "../dates";
 
 type Props = {
   year: number;
   month: number; // 0-based
   entries: Entry[];
+  selected?: string | null;
   onChangeMonth: (year: number, month: number) => void;
   onSelect: (date: string) => void;
 };
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
-export function CalendarView({ year, month, entries, onChangeMonth, onSelect }: Props) {
+export function CalendarView({ year, month, entries, selected, onChangeMonth, onSelect }: Props) {
   const byDate = new Map(entries.map((e) => [e.date, e]));
   const first = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -27,33 +29,34 @@ export function CalendarView({ year, month, entries, onChangeMonth, onSelect }: 
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button onClick={() => go(-1)} aria-label="Previous month">‹</button>
+      <div className="row" style={{ flexWrap: "nowrap" }}>
+        <Button icon onClick={() => go(-1)} aria-label="Previous month">‹</Button>
         <strong>{first.toLocaleString(undefined, { month: "long", year: "numeric" })}</strong>
-        <button onClick={() => go(1)} aria-label="Next month">›</button>
+        <Button icon onClick={() => go(1)} aria-label="Next month">›</Button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4, marginTop: 8 }}>
-        {WEEKDAYS.map((w, i) => <div key={i} style={{ textAlign: "center", fontSize: 12, color: "#666" }}>{w}</div>)}
+      <div className="cal-grid">
+        {WEEKDAYS.map((w, i) => <div key={i} className="cal-weekday" aria-hidden="true">{w}</div>)}
         {cells.map((d, i) => {
           if (!d) return <div key={i} />;
           const en = byDate.get(d);
+          const cls = [
+            "cal-day",
+            en && (en.completed ? "cal-day--done" : "cal-day--missed"),
+            d === today && "cal-day--today",
+            d === selected && "cal-day--selected",
+          ].filter(Boolean).join(" ");
           return (
-            <button
-              key={d}
-              onClick={() => onSelect(d)}
-              aria-label={d}
-              style={{
-                aspectRatio: "1", padding: 0, fontSize: 14, borderRadius: 6, cursor: "pointer",
-                border: d === today ? "2px solid #333" : "1px solid #ddd",
-                background: en ? (en.completed ? "#9be9a8" : "#ffd6d6") : "#fff",
-              }}
-            >
+            <button key={d} type="button" onClick={() => onSelect(d)} aria-label={d} aria-pressed={d === selected} className={cls}>
               {Number(d.slice(8))}
             </button>
           );
         })}
       </div>
-      <p style={{ fontSize: 12, color: "#666" }}>Green = completed, red = logged but not completed.</p>
+      <p className="legend">
+        <span className="legend__item"><span className="swatch" style={{ background: "#b7efc3" }} /> Completed</span>
+        <span className="legend__item"><span className="swatch" style={{ background: "#fbd0d0" }} /> Logged, not completed</span>
+        <span className="legend__item"><span className="swatch" style={{ background: "#fff" }} /> No entry</span>
+      </p>
     </div>
   );
 }

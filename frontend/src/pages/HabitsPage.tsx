@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { fetchStats } from "../api/stats";
-import { createHabit, fetchHabits } from "../api/habits";
+import { fetchHabits } from "../api/habits";
+import { LinkCard } from "../components/Card";
+import { CreateHabitModal } from "../components/CreateHabitModal";
+import { Fab } from "../components/Fab";
 import type { HabitStats } from "../types/entry";
 import type { Habit } from "../types/habit";
 
 export function HabitsPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [streaks, setStreaks] = useState<Record<number, HabitStats>>({});
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -34,75 +35,51 @@ export function HabitsPage() {
     void load();
   }, []);
 
-  async function onCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-
-    setLoading(true);
-    setError(null);
-    try {
-      await createHabit({
-        user_id: 1,
-        name: name.trim(),
-        description: description.trim() || undefined,
-      });
-      setName("");
-      setDescription("");
-      await load();
-    } catch (err) {
-      setError("Failed to create habit. Ensure backend is reachable at port 8000 from this device.");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
-      <h1>Habit Tracker</h1>
-      <p>Track your habits, streaks, and custom metrics.</p>
+    <main className="page stack">
+      <header>
+        <h1>Habit Tracker</h1>
+        <p className="muted">Track your habits, streaks, and custom metrics.</p>
+      </header>
 
-      {error && (
-        <p style={{ color: "crimson", background: "#fff0f0", padding: "0.75rem", borderRadius: 8 }}>
-          {error}
-        </p>
-      )}
-
-      <section style={{ marginTop: "1.5rem", marginBottom: "2rem" }}>
-        <h2>Create habit</h2>
-        <form onSubmit={onCreate} style={{ display: "grid", gap: "0.5rem", maxWidth: 420 }}>
-          <input
-            placeholder="Habit name (e.g. Air squats)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            placeholder="Description (optional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <button disabled={loading} type="submit">
-            {loading ? "Creating..." : "Create"}
-          </button>
-        </form>
-      </section>
+      {error && <p className="alert alert--error" role="alert">{error}</p>}
 
       <section>
         <h2>Your habits</h2>
         {habits.length === 0 ? (
-          <p>No habits yet. Add your first habit above.</p>
+          <p className="empty">No habits yet. Tap the + button to add your first habit.</p>
         ) : (
-          <ul>
+          <div className="card-grid">
             {habits.map((habit) => (
-              <li key={habit.id}>
-                <Link to={`/habits/${habit.id}`}><strong>{habit.name}</strong></Link>
-                {habit.description ? ` — ${habit.description}` : ""}
-                {streaks[habit.id] ? ` 🔥 ${streaks[habit.id].current_streak}-day streak` : ""}
-              </li>
+              <LinkCard key={habit.id} to={`/habits/${habit.id}`}>
+                <h3 className="card__title">{habit.name}</h3>
+                {habit.description && <p className="card__desc">{habit.description}</p>}
+                {streaks[habit.id] && (
+                  <p className="card__meta">🔥 {streaks[habit.id].current_streak}-day streak</p>
+                )}
+              </LinkCard>
             ))}
-          </ul>
+          </div>
         )}
       </section>
+
+      <Fab label="Create habit" onClick={() => setShowCreate(true)} />
+      {showCreate && (
+        <CreateHabitModal
+          onClose={() => setShowCreate(false)}
+          onCreated={async () => {
+            await load();
+            setToast("Habit created.");
+          }}
+        />
+      )}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </main>
   );
 }
