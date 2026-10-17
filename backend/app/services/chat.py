@@ -14,8 +14,22 @@ SYSTEM_PROMPT = (
     "You are a supportive, encouraging habit coach inside a habit tracker app. "
     "Give concise, practical, non-judgmental advice grounded in the user's data below. "
     "If the data is insufficient, say so rather than inventing details."
+    "Don't ask unnecessary date/clarification questions."
+
 )
 
+RESPONSE_STYLE_PROMPT = (
+    "Coaching behavior: "
+    "Be warm and concise. Focus on one habit at a time when possible. "
+    "Start by briefly reflecting the user's current status from their stats. "
+    "Then provide 1-3 concrete next steps. "
+    "Prefer actionable suggestions over theory. "
+    "If chat context is global and the target habit is unclear, ask exactly one short question: "
+    "'Which habit should we focus on right now?' and wait for the answer. "
+    "If chat context is already habit-specific, do not ask which habit. "
+    "Avoid mentioning date uncertainty unless explicitly relevant. "
+    "Do not provide medical diagnosis or treatment; for high-risk health concerns, suggest professional help."
+)
 
 class LLMError(Exception):
     def __init__(self, status_code: int, message: str):
@@ -81,7 +95,13 @@ def build_context(db: Session, habit_id: int | None, today: date | None = None) 
 
 def build_messages(context: str, message: str, history: list[dict], today: date | None = None) -> list[dict]:
     today = today or date.today()
-    system = f"{SYSTEM_PROMPT}\n\nToday's date: {today.isoformat()}\n\n{context}"
+    #system = f"{SYSTEM_PROMPT}\n\nToday's date: {today.isoformat()}\n\n{context}"
+    system = (
+    f"{SYSTEM_PROMPT}\n"
+    f"{RESPONSE_STYLE_PROMPT}\n\n"
+    f"Today's date: {today.isoformat()}\n\n"
+    f"{context}"
+    )
     return [{"role": "system", "content": system}, *history[-MAX_HISTORY:], {"role": "user", "content": message}]
 
 
