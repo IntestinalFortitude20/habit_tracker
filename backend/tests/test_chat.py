@@ -1,4 +1,6 @@
+import logging
 import os
+import re
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_chat.db"
 
@@ -56,3 +58,20 @@ def test_chat_with_mocked_llm(monkeypatch):
         assert len(captured["messages"]) == 12  # system + 10 history + user
         assert c.post("/api/chat", json={"message": "hi", "habit_id": 99999}).status_code == 404
         assert c.post("/api/chat", json={"message": "x" * 2001}).status_code == 422
+
+
+def test_call_llm_logs_model_and_duration(monkeypatch, caplog):
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "hello"}}]}
+
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(settings, "llm_model", "test-model")
+    monkeypatch.setattr(chat_service.httpx, "post", lambda *args, **kwargs: Response())
+    with caplog.at_level(logging.INFO, logger=chat_service.__name__):
+        assert chat_service.call_llm([]) == "hello"
+
+    assert re.search(r"model=test-model duration_seconds=\d+\.\d{3}", caplog.text)
