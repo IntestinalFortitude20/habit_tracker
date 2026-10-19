@@ -1,0 +1,84 @@
+[
+  {
+    "id": "flossing",
+    "name": "Flossing",
+    "description": "Floss your teeth every day.",
+    "cadence": "daily",
+    "cue": "After brushing my teeth at night",
+    "tiny_version": "Floss one tooth",
+    "metrics": [
+      {"name": "Flossed", "type": "boolean", "unit": null}
+    ]
+  },
+  {
+    "id": "exercise",
+    "name": "Exercise",
+    "description": "Move your body to build strength and energy.",
+    "cadence": "daily",
+    "cue": "After I put on my workout clothes in the morning",
+    "tiny_version": "Do 5 minutes of movement",
+    "metrics": [
+      {"name": "Duration", "type": "duration", "unit": "min"},
+      {"name": "Effort", "type": "rating", "unit": null}
+    ]
+  },
+  {
+    "id": "distance-running",
+    "name": "Distance running training",
+    "description": "Train toward a 5k, 10k, 15k, half-marathon or marathon with consistent runs.",
+    "cadence": "3-5 times per week",
+    "cue": "After my morning coffee, lace up my running shoes",
+    "tiny_version": "Put on running shoes and run for 5 minutes",
+    "metrics": [
+      {"name": "Distance", "type": "count", "unit": "km"},
+      {"name": "Duration", "type": "duration", "unit": "min"},
+      {"name": "Effort", "type": "rating", "unit": null}
+    ]
+  },
+  {
+    "id": "quit-smoking",
+    "name": "Quit smoking",
+    "description": "Reduce and stop smoking. Not medical advice: talk to a doctor or quitline for cessation support.",
+    "cadence": "daily",
+    "cue": "When I feel the urge to smoke, take 10 slow breaths first",
+    "tiny_version": "Delay the next cigarette by 10 minutes",
+    "metrics": [
+      {"name": "Cigarettes smoked", "type": "count", "unit": "cigarettes"},
+      {"name": "Smoke-free day", "type": "boolean", "unit": null}
+    ]
+  },
+  {
+    "id": "deep-work-coding",
+    "name": "Programming / deep work",
+    "description": "Protect focused time for coding or other deep work.",
+    "cadence": "daily",
+    "cue": "After I sit down at my desk with my first coffee",
+    "tiny_version": "Write code for 10 minutes",
+    "metrics": [
+      {"name": "Focus time", "type": "duration", "unit": "min"},
+      {"name": "Focus quality", "type": "rating", "unit": null}
+    ]
+  },
+  {
+    "id": "reading",
+    "name": "Reading",
+    "description": "Read a little every day.",
+    "cadence": "daily",
+    "cue": "After I get into bed",
+    "tiny_version": "Read one page",
+    "metrics": [
+      {"name": "Pages", "type": "count", "unit": "pages"}
+    ]
+  },
+  {
+    "id": "meditation",
+    "name": "Meditation",
+    "description": "Practice mindfulness to reduce stress.",
+    "cadence": "daily",
+    "cue": "After I pour my morning drink",
+    "tiny_version": "Take three deep breaths",
+    "metrics": [
+      {"name": "Duration", "type": "duration", "unit": "min"}
+    ]
+  }
+]
