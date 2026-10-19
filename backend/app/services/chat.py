@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.models import Entry, Habit, Metric
+from app.services.goals import goal_context_lines, rest_dates
 from app.services.stats import compute_stats
 
 MAX_HISTORY = 10
@@ -40,7 +41,7 @@ class LLMError(Exception):
 
 def _stats_for(db: Session, habit_id: int, today: date) -> dict:
     rows = db.query(Entry.date, Entry.completed).filter(Entry.habit_id == habit_id).all()
-    return compute_stats([(r.date, r.completed) for r in rows], today=today)
+    return compute_stats([(r.date, r.completed) for r in rows], today=today, rest_days=rest_dates(db, habit_id))
 
 
 def _fmt_value(metric: Metric, value: float) -> str:
@@ -74,6 +75,7 @@ def build_context(db: Session, habit_id: int | None, today: date | None = None) 
         f"7-day completion {round(stats['completion_rate_7d'] * 100)}%, "
         f"30-day completion {round(stats['completion_rate_30d'] * 100)}%."
     )
+    lines.extend(goal_context_lines(db, habit.id, today))
     since = today - timedelta(days=RECENT_DAYS - 1)
     entries = (
         db.query(Entry)

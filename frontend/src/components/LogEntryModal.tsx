@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchEntriesInRange, saveEntry } from "../api/entries";
+import { fetchGoal, fetchPlan } from "../api/goals";
+import type { Goal, Workout } from "../types/goal";
 import type { Metric } from "../types/metric";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
@@ -20,6 +22,10 @@ export function LogEntryModal({ habitId, metrics, initialDate, onClose, onSaved 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [goal, setGoal] = useState<Goal | null>(null);
+  const [workout, setWorkout] = useState<Workout | null>(null);
+
+  useEffect(() => { fetchGoal(habitId).then(setGoal).catch(console.error); }, [habitId]);
 
   // Prefill when the selected date already has an entry.
   useEffect(() => {
@@ -30,14 +36,23 @@ export function LogEntryModal({ habitId, metrics, initialDate, onClose, onSaved 
         if (cancelled) return;
         setExisting(!!en);
         setCompleted(en ? en.completed : true);
-        setValues(en ? Object.fromEntries(en.metric_values.map((v) => [v.metric_id, String(v.value)])) : {});
+        const entered = en ? Object.fromEntries(en.metric_values.map((v) => [v.metric_id, String(v.value)])) : {};
+        setValues(entered);
+        if (!goal) { setWorkout(null); return; }
+        // Show the day's planned target and pre-fill the distance metric for new entries.
+        return fetchPlan(habitId, date, date).then(([w]) => {
+          if (cancelled) return;
+          setWorkout(w ?? null);
+          if (!en && w?.target_distance && goal.metric_id) setValues({ [goal.metric_id]: String(w.target_distance) });
+          if (!en && w?.workout_type === "rest") setCompleted(true);
+        });
       })
       .catch((err) => {
         if (!cancelled) setError("Failed to load existing entry.");
         console.error(err);
       });
     return () => { cancelled = true; };
-  }, [habitId, date]);
+  }, [habitId, date, goal]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,6 +91,15 @@ export function LogEntryModal({ habitId, metrics, initialDate, onClose, onSaved 
       {error && <p className="alert alert--error" role="alert">{error}</p>}
       {success && <p className="alert alert--success" role="status">{success}</p>}
       <form id="log-entry-form" onSubmit={onSubmit}>
+        {workout && (
+          <p className="alert alert--success" role="status">
+            Target: <strong>{workout.workout_type.replace("_", " ")}</strong>
+            {workout.target_distance ? ` ${workout.target_distance} ${goal?.unit ?? ""}` : ""}
+            {workout.target_duration_min ? ` ${workout.target_duration_min} min` : ""}
+            {workout.percent_of_target !== null && workout.difference !== null &&
+              ` — logged ${workout.percent_of_target}% of target (${workout.difference >= 0 ? "+" : ""}${workout.difference} ${goal?.unit ?? ""})`}
+          </p>
+        )}
         <label className="field">Date <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
         <label className="field field--check"><input type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)} /> Completed</label>
         {metrics.map((m) => (
