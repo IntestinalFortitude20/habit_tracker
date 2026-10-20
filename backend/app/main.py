@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 from app.api.chat import router as chat_router
 from app.api.entries import router as entries_router
@@ -8,6 +9,8 @@ from app.api.metrics import router as metrics_router
 from app.api.stats import router as stats_router
 from app.core.config import settings
 from app.db.session import Base, engine
+
+logging.basicConfig(level=logging.INFO)
 
 Base.metadata.create_all(bind=engine)
 
