@@ -10,11 +10,28 @@ from app.api.metrics import router as metrics_router
 from app.api.stats import router as stats_router
 from app.api.templates import router as templates_router
 from app.core.config import settings
+from sqlalchemy import inspect, text
+
 from app.db.session import Base, engine
 
 logging.basicConfig(level=logging.INFO)
 
 Base.metadata.create_all(bind=engine)
+
+with engine.begin() as connection:
+    goal_columns = {column["name"] for column in inspect(engine).get_columns("goals")}
+    additions = {
+        "race_type": "VARCHAR(30)",
+        "end_date": "DATE",
+        "target_value": "FLOAT",
+        "start_value": "FLOAT",
+        "per_week": "INTEGER",
+        "per_month": "INTEGER",
+        "plan_source": "VARCHAR(20)",
+    }
+    for name, sql_type in additions.items():
+        if name not in goal_columns:
+            connection.execute(text(f"ALTER TABLE goals ADD COLUMN {name} {sql_type}"))
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 

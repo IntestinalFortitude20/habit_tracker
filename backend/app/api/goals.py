@@ -9,9 +9,12 @@ from app.models.models import Goal
 from app.schemas.goal import (
     Feasibility,
     GoalCreate,
+    GoalAccept,
     GoalCreated,
     GoalProgress,
     GoalRead,
+    PlanAdjustment,
+    PlanDayUpdate,
     GoalRegenerate,
     GoalType,
     Level,
@@ -72,6 +75,22 @@ def create_goal(habit_id: int, payload: GoalCreate, db: Session = Depends(get_db
     return {"goal": goal, "feasibility": feas, "workouts_created": count}
 
 
+@router.post("/draft")
+def draft_goal(habit_id: int, payload: GoalCreate, db: Session = Depends(get_db)):
+    habit = get_habit_or_404(db, habit_id)
+    plan = goal_service.draft_metric_plan(db, habit, payload)
+    return {"plan": plan, "disclaimer": training.DISCLAIMER}
+
+
+@router.post("/accept", response_model=GoalCreated, status_code=status.HTTP_201_CREATED)
+def accept_goal(habit_id: int, payload: GoalAccept, db: Session = Depends(get_db)):
+    habit = get_habit_or_404(db, habit_id)
+    if payload.goal.goal_type != "metric_target" or not payload.plan:
+        raise HTTPException(status_code=422, detail="A metric-target plan draft is required.")
+    goal, feas, count = goal_service.create_goal(db, habit, payload.goal, payload.plan)
+    return {"goal": goal, "feasibility": feas, "workouts_created": count}
+
+
 @router.get("", response_model=GoalRead)
 def get_goal(habit_id: int, db: Session = Depends(get_db)):
     return active_goal_or_404(db, habit_id)
@@ -88,6 +107,19 @@ def cancel_goal(habit_id: int, db: Session = Depends(get_db)):
 def get_plan(habit_id: int, start: date | None = None, end: date | None = None, db: Session = Depends(get_db)):
     goal = active_goal_or_404(db, habit_id)
     return goal_service.list_workouts(db, goal, start, end)
+
+
+@router.put("/plan/{plan_date}", response_model=WorkoutRead)
+def update_plan_day(habit_id: int, plan_date: date, payload: PlanDayUpdate, db: Session = Depends(get_db)):
+    goal = active_goal_or_404(db, habit_id)
+    return goal_service.update_plan_day(db, goal, plan_date, payload.model_dump(exclude_unset=True))
+
+
+@router.post("/adjust")
+def adjust_plan(habit_id: int, payload: PlanAdjustment, db: Session = Depends(get_db)):
+    goal = active_goal_or_404(db, habit_id)
+    changed = goal_service.adjust_metric_plan(db, goal, payload.prompt)
+    return {"days_adjusted": changed}
 
 
 @router.get("/progress", response_model=GoalProgress)
