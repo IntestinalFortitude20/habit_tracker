@@ -7,6 +7,7 @@ from app.api.entries import router as entries_router
 from app.api.habits import router as habits_router
 from app.api.metrics import router as metrics_router
 from app.api.stats import router as stats_router
+from app.api.templates import router as templates_router
 from app.core.config import settings
 from app.db.session import Base, engine
 
@@ -30,6 +31,7 @@ app.include_router(metrics_router)
 app.include_router(entries_router)
 app.include_router(stats_router)
 app.include_router(chat_router)
+app.include_router(templates_router)
 
 
 @app.get("/health")
