@@ -193,22 +193,88 @@ def create_goal(db: Session, habit: Habit, payload: GoalCreate, plan: list[PlanD
     return goal, feas, count
 
 
-def update_plan_day(db: Session, goal: Goal, day: date, updates: dict) -> dict:
-    if goal.goal_type != "metric_target":
-        raise HTTPException(status_code=422, detail="Only metric target plan days can be edited.")
+REST_NOTE = "Rest day (changed by you)"
+
+
+def _default_workout(db: Session, goal: Goal, day: date) -> dict:
+    """Sensible default target for turning a rest day back into a workout day."""
+    if goal.goal_type == "metric_target":
+        match = next((w for w in _metric_plan(goal) if w["date"] == day), None)
+        return {"workout_type": "target", "target_distance": match["target_distance"] if match else goal.target_value,
+                "target_duration_min": None, "phase": None, "notes": None}
+    plan = training.generate_plan(
+        goal.race_type or goal.goal_type, goal.experience_level, goal.start_date, goal.target_date, goal.unit
+    )
+    match = next((w for w in plan if w["date"] == day), None)
+    if match and match["workout_type"] != "rest":
+        return {k: match[k] for k in ("workout_type", "target_distance", "target_duration_min", "phase", "notes")}
+    neighbours = db.query(PlannedWorkout).filter(
+        PlannedWorkout.goal_id == goal.id,
+        PlannedWorkout.workout_type != "rest",
+        PlannedWorkout.target_distance.isnot(None),
+    ).all()
+    near = min(neighbours, key=lambda w: abs((w.date - day).days), default=None)
+    return {"workout_type": "easy", "target_distance": near.target_distance if near else 1.0,
+            "target_duration_min": None, "phase": near.phase if near else None, "notes": "Easy run."}
+
+
+def update_plan_day(db: Session, goal: Goal, day: date, updates: dict, today: date | None = None) -> dict:
+    if goal.goal_type not in ("metric_target", "running_plan", *training.goal_types()):
+        raise HTTPException(status_code=422, detail="Only running and metric target plan days can be edited.")
+    today = today or date.today()
     workout = db.query(PlannedWorkout).filter(
         PlannedWorkout.goal_id == goal.id, PlannedWorkout.date == day
     ).first()
     if workout is None:
         raise HTTPException(status_code=404, detail="No planned target exists for this date.")
+    updates = dict(updates)
+    confirm = updates.pop("confirm", False)
+    if "target_value" in updates:
+        updates.setdefault("target_distance", updates["target_value"])
+        del updates["target_value"]
+    new_type = updates.pop("workout_type", None)
+    was_rest = workout.workout_type == "rest"
+    entry_info = _entry_lookup(db, goal, day, day).get(day)
+    to_rest = new_type == "rest" and not was_rest
+    from_rest = new_type is not None and new_type != "rest" and was_rest
+    if (to_rest or from_rest) and not confirm:
+        reasons = []
+        if day < today:
+            reasons.append("This changes a past day and may change your streak and plan progress.")
+        if to_rest and entry_info is not None:
+            reasons.append("The logged entry for this day is kept.")
+        if reasons:
+            raise HTTPException(status_code=409, detail={"message": " ".join(reasons) + " Continue?", "requires_confirmation": True})
+    if to_rest:
+        workout.workout_type = "rest"
+        workout.target_distance = None
+        workout.target_duration_min = None
+        updates["notes"] = (updates.get("notes") or "").strip() or REST_NOTE
+    elif from_rest:
+        default = _default_workout(db, goal, day)
+        for field, value in default.items():
+            if updates.get(field) is None:
+                updates[field] = value
+        default_type = updates.pop("workout_type")
+        workout.workout_type = "deload" if new_type == "deload" else default_type
+    elif new_type == "deload":
+        workout.workout_type = "deload"
+    if workout.workout_type == "rest" and not to_rest:
+        updates.pop("target_distance", None)
+        updates.pop("target_duration_min", None)
     for field, value in updates.items():
-        setattr(workout, "target_distance" if field == "target_value" else field, value)
+        setattr(workout, field, value)
+    workout.edited = True
     db.commit()
-    return workout_view(workout, _entry_lookup(db, goal, day, day).get(day), date.today())
+    return workout_view(workout, entry_info, today)
 
 
-def regenerate_plan(db: Session, goal: Goal, target: date | None, level: str | None, today: date | None = None) -> tuple[dict, int]:
-    """Re-plan the remaining days (today onward). Past workouts and entries are kept; missed work is not caught up."""
+def regenerate_plan(
+    db: Session, goal: Goal, target: date | None, level: str | None, today: date | None = None,
+    preserve_edits: bool = True,
+) -> tuple[dict, int]:
+    """Re-plan the remaining days (today onward). Past workouts and entries are kept; missed work is not caught up.
+    With preserve_edits, manually edited days in the remaining range are kept as they are."""
     if goal.goal_type != "running_plan" and goal.goal_type not in training.goal_types():
         raise HTTPException(status_code=422, detail="Only running plans can be regenerated this way.")
     today = today or date.today()
@@ -217,11 +283,19 @@ def regenerate_plan(db: Session, goal: Goal, target: date | None, level: str | N
     start = max(today, goal.start_date)
     feas = feasibility_or_422(goal.race_type or goal.goal_type, new_level, start, new_target)
     try:
-        db.query(PlannedWorkout).filter(PlannedWorkout.goal_id == goal.id, PlannedWorkout.date >= start).delete()
+        remaining = db.query(PlannedWorkout).filter(PlannedWorkout.goal_id == goal.id, PlannedWorkout.date >= start)
+        kept = set()
+        if preserve_edits:
+            kept = {w.date for w in remaining.filter(PlannedWorkout.edited.is_(True), PlannedWorkout.date <= new_target).all()}
+            remaining = remaining.filter(~PlannedWorkout.date.in_(kept)) if kept else remaining
+        remaining.delete(synchronize_session=False)
         goal.target_date = new_target
         goal.end_date = new_target
         goal.experience_level = new_level
-        count = _store_plan(db, goal, start)
+        plan = training.generate_plan(goal.race_type or goal.goal_type, new_level, start, new_target, goal.unit)
+        plan = [w for w in plan if w["date"] not in kept]
+        db.add_all(PlannedWorkout(goal_id=goal.id, **w) for w in plan)
+        count = len(plan)
         db.commit()
     except Exception:
         db.rollback()
@@ -344,6 +418,7 @@ def workout_view(w: PlannedWorkout, entry_info: tuple[Entry, float | None] | Non
         "target_value": w.target_distance,
         "phase": w.phase,
         "notes": w.notes,
+        "edited": bool(w.edited),
         "status": status,
         "entry_id": entry.id if entry else None,
         "actual_distance": actual,

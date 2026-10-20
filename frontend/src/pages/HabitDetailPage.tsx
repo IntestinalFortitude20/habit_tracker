@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchEntriesInRange, fetchLatestEntry } from "../api/entries";
 import { fetchHabit } from "../api/habits";
-import { fetchGoal, fetchPlan } from "../api/goals";
+import { editPlanDay, fetchGoal, fetchPlan } from "../api/goals";
 import { fetchMetrics } from "../api/metrics";
 import { fetchStats } from "../api/stats";
 import { Button } from "../components/Button";
@@ -149,8 +149,12 @@ export function HabitDetailPage() {
       )}
       {selectedDate && !logDate && (
         <DayDetailModal
+          key={selectedDate}
           date={selectedDate}
           entry={findEntry(selectedDate)}
+          hasPlan={plan.length > 0}
+          workout={plan.find((w) => w.date === selectedDate)}
+          onPlanChange={async (edit) => { await editPlanDay(id, selectedDate, edit); await refresh(); }}
           metrics={metrics}
           onClose={() => setSelectedDate(null)}
           onEdit={() => { setLogDate(selectedDate); setSelectedDate(null); }}

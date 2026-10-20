@@ -66,7 +66,8 @@ def test_goal_api_flow():
         assert after["percent_of_target"] == 50.0 and after["difference"] < 0
         prog = c.get(f"/api/habits/{h}/goal/progress").json()
         assert prog["weeks_remaining"] == 30 and prog["on_track"]
-        assert c.post(f"/api/habits/{h}/goal/regenerate", json={}).status_code == 200
+        assert c.post(f"/api/habits/{h}/goal/regenerate", json={}).status_code == 409
+        assert c.post(f"/api/habits/{h}/goal/regenerate", json={"confirm": True}).status_code == 200
         assert c.delete(f"/api/habits/{h}/goal").status_code == 204
         assert c.get(f"/api/habits/{h}/goal").status_code == 404
 
@@ -160,3 +161,101 @@ def test_ai_plan_is_draft_until_accepted(monkeypatch):
         })
         assert accepted.status_code == 201
         assert accepted.json()["goal"]["plan_source"] == "ai"
+
+
+def _running_goal(c, name):
+    h = c.post("/api/habits", json={"user_id": 1, "name": name}).json()["id"]
+    today = date.today()
+    target = today + timedelta(days=30 * 7)
+    r = c.post(f"/api/habits/{h}/goal", json={"goal_type": "marathon", "target_date": target.isoformat()})
+    assert r.status_code == 201
+    return h, r.json()["goal"], today
+
+
+def _plan_day(c, h, day):
+    return c.get(f"/api/habits/{h}/goal/plan?start={day}&end={day}").json()[0]
+
+
+def test_convert_to_rest_and_back_marks_edited_and_keeps_streak():
+    with TestClient(app) as c:
+        h, goal, today = _running_goal(c, "rest-convert")
+        run = next(w for w in c.get(f"/api/habits/{h}/goal/plan?start={today + timedelta(days=1)}&end={today + timedelta(days=14)}").json() if w["target_distance"])
+        day = run["date"]
+        assert run["edited"] is False
+        edit = c.put(f"/api/habits/{h}/goal/plan/{day}", json={"target_distance": 3.5}).json()
+        assert edit["target_distance"] == 3.5 and edit["edited"] is True
+        rest = c.put(f"/api/habits/{h}/goal/plan/{day}", json={"workout_type": "rest", "notes": "sore knee"}).json()
+        assert rest["status"] == "rest" and rest["notes"] == "sore knee" and rest["target_distance"] is None
+        d = date.fromisoformat(day)
+        from app.db.session import SessionLocal
+        from app.services.goals import rest_dates
+        with SessionLocal() as db:
+            assert d in rest_dates(db, h)
+        back = c.put(f"/api/habits/{h}/goal/plan/{day}", json={"workout_type": "workout"}).json()
+        assert back["status"] != "rest" and back["target_distance"] == run["target_distance"]
+        default_note = c.put(f"/api/habits/{h}/goal/plan/{day}", json={"workout_type": "rest"}).json()
+        assert default_note["notes"] == "Rest day (changed by you)"
+
+
+def test_past_day_converted_to_rest_keeps_streak_and_entry():
+    with TestClient(app) as c:
+        h = c.post("/api/habits", json={"user_id": 1, "name": "past-edit"}).json()["id"]
+        today = date.today()
+        r = c.post(f"/api/habits/{h}/goal", json={
+            "goal_type": "marathon", "start_date": (today - timedelta(days=10)).isoformat(),
+            "target_date": (today + timedelta(days=30 * 7)).isoformat()})
+        assert r.status_code == 201
+        past = [w for w in c.get(f"/api/habits/{h}/goal/plan?start={today - timedelta(days=6)}&end={today - timedelta(days=1)}").json()
+                if w["workout_type"] != "rest"]
+        day = past[0]["date"]
+        d = date.fromisoformat(day)
+        for offset in (d - timedelta(days=1), d + timedelta(days=1)):
+            c.post(f"/api/habits/{h}/entries", json={"date": offset.isoformat(), "completed": True})
+        c.post(f"/api/habits/{h}/entries", json={"date": day, "completed": True})
+        denied = c.put(f"/api/habits/{h}/goal/plan/{day}", json={"workout_type": "rest"})
+        assert denied.status_code == 409 and denied.json()["detail"]["requires_confirmation"]
+        ok = c.put(f"/api/habits/{h}/goal/plan/{day}", json={"workout_type": "rest", "confirm": True}).json()
+        assert ok["status"] == "rest" and ok["entry_id"] is not None and ok["edited"]
+        stats = c.get(f"/api/habits/{h}/stats").json()
+        assert stats["longest_streak"] >= 3
+
+
+def test_past_day_edit_requires_confirmation_service():
+    from app.db.session import SessionLocal
+    from app.services import goals as svc
+    import pytest
+    from fastapi import HTTPException
+
+    with TestClient(app) as c:
+        h, goal, today = _running_goal(c, "past-svc")
+        db = SessionLocal()
+        try:
+            g = svc.get_active_goal(db, h)
+            later = today + timedelta(days=10)
+            run = next(w for w in svc.list_workouts(db, g, today + timedelta(days=1), later) if w["status"] != "rest")
+            future_today = date.fromisoformat(run["date"].isoformat()) + timedelta(days=3)
+            with pytest.raises(HTTPException) as exc:
+                svc.update_plan_day(db, g, run["date"], {"workout_type": "rest"}, today=future_today)
+            assert exc.value.status_code == 409
+            out = svc.update_plan_day(db, g, run["date"], {"workout_type": "rest", "confirm": True}, today=future_today)
+            assert out["status"] == "rest" and out["edited"]
+        finally:
+            db.close()
+
+
+def test_regenerate_preserve_edits_on_and_off():
+    with TestClient(app) as c:
+        h, goal, today = _running_goal(c, "regen")
+        run = next(w for w in c.get(f"/api/habits/{h}/goal/plan?start={today + timedelta(days=1)}&end={today + timedelta(days=14)}").json() if w["target_distance"])
+        day = run["date"]
+        c.put(f"/api/habits/{h}/goal/plan/{day}", json={"target_distance": 9.5})
+        total = len(c.get(f"/api/habits/{h}/goal/plan").json())
+        kept = c.post(f"/api/habits/{h}/goal/regenerate", json={"confirm": True, "preserve_edits": True})
+        assert kept.status_code == 200
+        after = _plan_day(c, h, day)
+        assert after["target_distance"] == 9.5 and after["edited"] is True
+        assert len(c.get(f"/api/habits/{h}/goal/plan").json()) == total
+        c.post(f"/api/habits/{h}/goal/regenerate", json={"confirm": True, "preserve_edits": False})
+        reset = _plan_day(c, h, day)
+        assert reset["target_distance"] == run["target_distance"] and reset["edited"] is False
+        assert len(c.get(f"/api/habits/{h}/goal/plan").json()) == total

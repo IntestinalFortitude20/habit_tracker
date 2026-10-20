@@ -1,6 +1,6 @@
 import axios from "axios";
 import { api } from "./client";
-import type { Goal, GoalPayload, GoalPlanDay, GoalProgress, GoalTypeInfo, Workout } from "../types/goal";
+import type { Goal, GoalPayload, GoalPlanDay, GoalProgress, GoalTypeInfo, PlanDayEdit, Workout } from "../types/goal";
 
 const base = (habitId: number) => `/api/habits/${habitId}/goal`;
 
@@ -45,8 +45,21 @@ export async function adjustGoalPlan(habitId: number, prompt: string): Promise<v
   await api.post(`${base(habitId)}/adjust`, { prompt });
 }
 
-export async function regenerateGoal(habitId: number): Promise<void> {
-  await api.post(`${base(habitId)}/regenerate`, {});
+export async function editPlanDay(habitId: number, date: string, edit: PlanDayEdit): Promise<Workout> {
+  return (await api.put<Workout>(`${base(habitId)}/plan/${date}`, edit)).data;
+}
+
+export async function regenerateGoal(habitId: number, preserveEdits = true): Promise<void> {
+  await api.post(`${base(habitId)}/regenerate`, { confirm: true, preserve_edits: preserveEdits });
+}
+
+// Returns the backend's warning when a plan edit needs the user's confirmation, otherwise null.
+export function confirmationMessage(err: unknown): string | null {
+  if (axios.isAxiosError(err) && err.response?.status === 409) {
+    const detail = err.response.data?.detail;
+    if (detail?.requires_confirmation && typeof detail.message === "string") return detail.message;
+  }
+  return null;
 }
 
 export async function cancelGoal(habitId: number): Promise<void> {

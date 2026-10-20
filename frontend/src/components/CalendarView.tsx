@@ -48,6 +48,7 @@ export function CalendarView({ year, month, entries, plan = [], selected, onChan
             en && (en.completed ? "cal-day--done" : "cal-day--missed"),
             !en && pw && `cal-day--plan-${pw.status}`,
             pw && `cal-day--type-${pw.workout_type}`,
+            pw?.edited && "cal-day--edited",
             d === today && "cal-day--today",
             d === selected && "cal-day--selected",
           ].filter(Boolean).join(" ");
@@ -55,6 +56,7 @@ export function CalendarView({ year, month, entries, plan = [], selected, onChan
             <button key={d} type="button" onClick={() => onSelect(d)} aria-label={d} aria-pressed={d === selected} className={cls}
               title={pw ? `${pw.workout_type}${pw.target_value ?? pw.target_distance ? ` ${pw.target_value ?? pw.target_distance}` : ""}` : undefined}>
               {Number(d.slice(8))}
+              {pw?.edited && <span className="cal-edited" aria-label="edited" title="Edited">✎</span>}
               {pw && pw.workout_type !== "rest" && <small className="cal-target">{pw.target_value ?? pw.target_distance ?? "•"}</small>}
             </button>
           );

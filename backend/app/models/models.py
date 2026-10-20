@@ -106,5 +106,6 @@ class PlannedWorkout(Base):
     target_duration_min = Column(Float, nullable=True)
     phase = Column(String(20), nullable=True)
     notes = Column(Text, nullable=True)
+    edited = Column(Boolean, nullable=False, default=False, server_default="0")
 
     goal = relationship("Goal", back_populates="workouts")

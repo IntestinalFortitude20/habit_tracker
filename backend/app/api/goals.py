@@ -134,6 +134,8 @@ def get_progress(habit_id: int, db: Session = Depends(get_db)):
 def regenerate(habit_id: int, payload: GoalRegenerate | None = None, db: Session = Depends(get_db)):
     goal = active_goal_or_404(db, habit_id)
     payload = payload or GoalRegenerate()
-    feas, count = goal_service.regenerate_plan(db, goal, payload.target_date, payload.experience_level)
+    if not payload.confirm:
+        raise HTTPException(status_code=409, detail={"message": "Confirm the regenerate to apply it.", "requires_confirmation": True})
+    feas, count = goal_service.regenerate_plan(db, goal, payload.target_date, payload.experience_level, preserve_edits=payload.preserve_edits)
     db.refresh(goal)
     return {"goal": goal, "feasibility": feas, "workouts_created": count}
