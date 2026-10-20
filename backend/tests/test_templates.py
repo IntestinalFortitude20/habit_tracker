@@ -1,10 +1,6 @@
-import os
+from fastapi.testclient import TestClient
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_templates.db"
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-from app.main import app  # noqa: E402
+from app.main import app
 
 
 def test_list_templates():

@@ -1,18 +1,15 @@
 import json
 import logging
-import os
 import re
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_chat.db"
+from datetime import date
 
-from datetime import date  # noqa: E402
+from fastapi.testclient import TestClient
 
-from fastapi.testclient import TestClient  # noqa: E402
-
-from app.core.config import settings  # noqa: E402
-from app.db.session import SessionLocal  # noqa: E402
-from app.main import app  # noqa: E402
-from app.services import chat as chat_service  # noqa: E402
+from app.core.config import settings
+from app.db.session import SessionLocal
+from app.main import app
+from app.services import chat as chat_service
 
 
 def _make_habit(c):
