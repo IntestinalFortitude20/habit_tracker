@@ -29,6 +29,7 @@ class Habit(Base):
     user = relationship("User", back_populates="habits")
     metrics = relationship("Metric", back_populates="habit", cascade="all, delete-orphan")
     entries = relationship("Entry", back_populates="habit", cascade="all, delete-orphan")
+    goals = relationship("Goal", back_populates="habit", cascade="all, delete-orphan")
 
 
 class Metric(Base):
@@ -66,3 +67,37 @@ class MetricValue(Base):
 
     entry = relationship("Entry", back_populates="metric_values")
     metric = relationship("Metric", back_populates="values")
+
+
+class Goal(Base):
+    __tablename__ = "goals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    habit_id = Column(Integer, ForeignKey("habits.id"), nullable=False, index=True)
+    metric_id = Column(Integer, ForeignKey("metrics.id", ondelete="SET NULL"), nullable=True)
+    goal_type = Column(String(30), nullable=False)  # 5k | 10k | half_marathon | marathon
+    distance = Column(Float, nullable=False)
+    unit = Column(String(10), default="mi", nullable=False)  # mi | km
+    experience_level = Column(String(20), default="beginner", nullable=False)
+    start_date = Column(Date, nullable=False)
+    target_date = Column(Date, nullable=False)
+    status = Column(String(20), default="active", nullable=False)  # active | completed | cancelled
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    habit = relationship("Habit", back_populates="goals")
+    workouts = relationship("PlannedWorkout", back_populates="goal", cascade="all, delete-orphan")
+
+
+class PlannedWorkout(Base):
+    __tablename__ = "planned_workouts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    goal_id = Column(Integer, ForeignKey("goals.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    workout_type = Column(String(30), nullable=False)  # easy | long | tempo | rest | cross_training | race
+    target_distance = Column(Float, nullable=True)
+    target_duration_min = Column(Float, nullable=True)
+    phase = Column(String(20), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    goal = relationship("Goal", back_populates="workouts")

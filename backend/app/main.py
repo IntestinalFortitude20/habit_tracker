@@ -4,6 +4,7 @@ import logging
 
 from app.api.chat import router as chat_router
 from app.api.entries import router as entries_router
+from app.api.goals import router as goals_router, types_router as goal_types_router
 from app.api.habits import router as habits_router
 from app.api.metrics import router as metrics_router
 from app.api.stats import router as stats_router
@@ -31,6 +32,8 @@ app.include_router(metrics_router)
 app.include_router(entries_router)
 app.include_router(stats_router)
 app.include_router(chat_router)
+app.include_router(goal_types_router)
+app.include_router(goals_router)
 app.include_router(templates_router)
 
 

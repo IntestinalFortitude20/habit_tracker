@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchEntriesInRange, fetchLatestEntry } from "../api/entries";
 import { fetchHabit } from "../api/habits";
+import { fetchGoal, fetchPlan } from "../api/goals";
 import { fetchMetrics } from "../api/metrics";
 import { fetchStats } from "../api/stats";
 import { Button } from "../components/Button";
@@ -15,6 +16,7 @@ import { LogEntryModal } from "../components/LogEntryModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { addDays, toISO, todayISO } from "../dates";
 import type { Entry, HabitStats } from "../types/entry";
+import type { Workout } from "../types/goal";
 import type { Habit } from "../types/habit";
 import type { Metric } from "../types/metric";
 
@@ -30,6 +32,7 @@ export function HabitDetailPage() {
   const [view, setView] = useState<"calendar" | "heatmap">("calendar");
   const [ym, setYm] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [monthEntries, setMonthEntries] = useState<Entry[]>([]);
+  const [plan, setPlan] = useState<Workout[]>([]);
   const [latestDate, setLatestDate] = useState<string | null>(null);
   const [heatEntries, setHeatEntries] = useState<Entry[]>([]);
 
@@ -46,6 +49,8 @@ export function HabitDetailPage() {
       fetchEntriesInRange(id, monthStart, monthEnd),
       fetchLatestEntry(id),
     ]);
+    const goal = await fetchGoal(id);
+    setPlan(goal ? await fetchPlan(id, monthStart, monthEnd) : []);
     setStats(s);
     setMonthEntries(me);
     setLatestDate(latest?.date ?? null);
@@ -111,6 +116,7 @@ export function HabitDetailPage() {
               year={ym.year}
               month={ym.month}
               entries={monthEntries}
+              plan={plan}
               selected={selectedDate}
               onChangeMonth={(year, month) => setYm({ year, month })}
               onSelect={setSelectedDate}

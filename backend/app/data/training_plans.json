@@ -1,0 +1,67 @@
+{
+  "_note": "Original plan parameters (not copied from any published plan). Structure follows common guidance: gradual weekly mileage build (~10%/week), a recovery week every 4th week, a taper before race day. Distances are in miles. General training guidance, not medical advice.",
+  "max_weeks": 104,
+  "goals": {
+    "5k": {
+      "label": "5K", "distance_miles": 3.1, "taper_weeks": 1,
+      "levels": {
+        "beginner": {"min_weeks": 8, "start_weekly": 6, "peak_weekly": 15, "peak_long": 5},
+        "intermediate": {"min_weeks": 6, "start_weekly": 12, "peak_weekly": 22, "peak_long": 8},
+        "advanced": {"min_weeks": 4, "start_weekly": 18, "peak_weekly": 28, "peak_long": 10}
+      }
+    },
+    "10k": {
+      "label": "10K", "distance_miles": 6.2, "taper_weeks": 1,
+      "levels": {
+        "beginner": {"min_weeks": 10, "start_weekly": 8, "peak_weekly": 20, "peak_long": 8},
+        "intermediate": {"min_weeks": 8, "start_weekly": 14, "peak_weekly": 28, "peak_long": 10},
+        "advanced": {"min_weeks": 6, "start_weekly": 20, "peak_weekly": 35, "peak_long": 12}
+      }
+    },
+    "half_marathon": {
+      "label": "Half marathon", "distance_miles": 13.1, "taper_weeks": 2,
+      "levels": {
+        "beginner": {"min_weeks": 14, "start_weekly": 10, "peak_weekly": 28, "peak_long": 11},
+        "intermediate": {"min_weeks": 10, "start_weekly": 18, "peak_weekly": 38, "peak_long": 12},
+        "advanced": {"min_weeks": 8, "start_weekly": 25, "peak_weekly": 45, "peak_long": 14}
+      }
+    },
+    "marathon": {
+      "label": "Marathon", "distance_miles": 26.2, "taper_weeks": 3,
+      "levels": {
+        "beginner": {"min_weeks": 20, "start_weekly": 14, "peak_weekly": 40, "peak_long": 20},
+        "intermediate": {"min_weeks": 16, "start_weekly": 25, "peak_weekly": 50, "peak_long": 20},
+        "advanced": {"min_weeks": 12, "start_weekly": 35, "peak_weekly": 60, "peak_long": 22}
+      }
+    }
+  },
+  "schedules": {
+    "beginner": {
+      "0": {"type": "rest"},
+      "1": {"type": "easy", "share": 0.2},
+      "2": {"type": "cross_training", "duration_min": 30},
+      "3": {"type": "easy", "share": 0.2},
+      "4": {"type": "rest"},
+      "5": {"type": "long", "share": 0.4},
+      "6": {"type": "easy", "share": 0.2}
+    },
+    "intermediate": {
+      "0": {"type": "rest"},
+      "1": {"type": "easy", "share": 0.18},
+      "2": {"type": "tempo", "share": 0.18},
+      "3": {"type": "easy", "share": 0.14},
+      "4": {"type": "rest"},
+      "5": {"type": "long", "share": 0.35},
+      "6": {"type": "easy", "share": 0.15}
+    },
+    "advanced": {
+      "0": {"type": "easy", "share": 0.1},
+      "1": {"type": "tempo", "share": 0.18},
+      "2": {"type": "easy", "share": 0.15},
+      "3": {"type": "easy", "share": 0.12},
+      "4": {"type": "rest"},
+      "5": {"type": "long", "share": 0.32},
+      "6": {"type": "easy", "share": 0.13}
+    }
+  }
+}

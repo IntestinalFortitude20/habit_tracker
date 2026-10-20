@@ -224,3 +224,13 @@ Emphasize:
 ## 📄 License
 
 MIT
+
+## 🏃 Goal-based training plans
+
+Pick a goal (5K, 10K, half marathon, marathon) and target date from a habit's **Settings**. The backend checks feasibility
+(too-soon dates are rejected with the earliest realistic date), generates one planned workout per day (static parameters in
+`backend/app/data/training_plans.json`), and the calendar and log screen show each day's target.
+
+- `POST/GET/DELETE /api/habits/{id}/goal`, `GET .../goal/feasibility`, `GET .../goal/plan`, `GET .../goal/progress`, `POST .../goal/regenerate`
+- Planned rest days never break a streak. Missed workouts are skipped (not caught up); regenerate re-plans from today.
+- General training guidance, not medical advice.

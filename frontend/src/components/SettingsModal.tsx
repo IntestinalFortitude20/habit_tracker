@@ -3,6 +3,7 @@ import { deleteHabit } from "../api/habits";
 import { createMetric, deleteMetric, updateMetric } from "../api/metrics";
 import type { Metric, MetricType } from "../types/metric";
 import { Button } from "./Button";
+import { GoalSection } from "./GoalSection";
 import { Modal } from "./Modal";
 
 const METRIC_TYPES: MetricType[] = ["boolean", "count", "duration", "rating"];
@@ -114,7 +115,8 @@ export function SettingsModal({ habitId, habitName, metrics, onClose, onChanged,
     <Modal title="Settings" onClose={onClose}>
       {error && <p className="alert alert--error" role="alert">{error}</p>}
       {success && <p className="alert alert--success" role="status">{success}</p>}
-      <h3 style={{ marginTop: 0 }}>Metrics</h3>
+      <GoalSection habitId={habitId} onChanged={onChanged} />
+      <h3>Metrics</h3>
       {metrics.length === 0 ? <p className="empty">No metrics yet.</p> : (
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
           {metrics.map((m) => (
