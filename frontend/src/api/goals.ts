@@ -1,6 +1,6 @@
 import axios from "axios";
 import { api } from "./client";
-import type { Goal, GoalPayload, GoalProgress, GoalTypeInfo, Workout } from "../types/goal";
+import type { Goal, GoalPayload, GoalPlanDay, GoalProgress, GoalTypeInfo, Workout } from "../types/goal";
 
 const base = (habitId: number) => `/api/habits/${habitId}/goal`;
 
@@ -27,6 +27,22 @@ export async function fetchProgress(habitId: number): Promise<GoalProgress> {
 
 export async function createGoal(habitId: number, payload: GoalPayload): Promise<void> {
   await api.post(base(habitId), payload);
+}
+
+export async function draftGoal(habitId: number, payload: GoalPayload): Promise<{ plan: GoalPlanDay[]; disclaimer: string }> {
+  return (await api.post(`${base(habitId)}/draft`, payload)).data;
+}
+
+export async function acceptGoal(habitId: number, goal: GoalPayload, plan: GoalPlanDay[]): Promise<void> {
+  await api.post(`${base(habitId)}/accept`, { goal, plan });
+}
+
+export async function updatePlanDay(habitId: number, day: GoalPlanDay): Promise<void> {
+  await api.put(`${base(habitId)}/plan/${day.date}`, day);
+}
+
+export async function adjustGoalPlan(habitId: number, prompt: string): Promise<void> {
+  await api.post(`${base(habitId)}/adjust`, { prompt });
 }
 
 export async function regenerateGoal(habitId: number): Promise<void> {

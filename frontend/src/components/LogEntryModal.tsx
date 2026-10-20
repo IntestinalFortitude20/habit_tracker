@@ -43,7 +43,7 @@ export function LogEntryModal({ habitId, metrics, initialDate, onClose, onSaved 
         return fetchPlan(habitId, date, date).then(([w]) => {
           if (cancelled) return;
           setWorkout(w ?? null);
-          if (!en && w?.target_distance && goal.metric_id) setValues({ [goal.metric_id]: String(w.target_distance) });
+          if (!en && (w?.target_value ?? w?.target_distance) != null && goal.metric_id) setValues({ [goal.metric_id]: String(w.target_value ?? w.target_distance) });
           if (!en && w?.workout_type === "rest") setCompleted(true);
         });
       })
@@ -94,7 +94,9 @@ export function LogEntryModal({ habitId, metrics, initialDate, onClose, onSaved 
         {workout && (
           <p className="alert alert--success" role="status">
             Target: <strong>{workout.workout_type.replace("_", " ")}</strong>
-            {workout.target_distance ? ` ${workout.target_distance} ${goal?.unit ?? ""}` : ""}
+            {goal?.goal_type === "metric_target" && workout.target_value != null
+              ? ` ${workout.target_value} ${goal.unit}`
+              : workout.target_distance ? ` ${workout.target_distance} ${goal?.unit ?? ""}` : ""}
             {workout.target_duration_min ? ` ${workout.target_duration_min} min` : ""}
             {workout.percent_of_target !== null && workout.difference !== null &&
               ` — logged ${workout.percent_of_target}% of target (${workout.difference >= 0 ? "+" : ""}${workout.difference} ${goal?.unit ?? ""})`}

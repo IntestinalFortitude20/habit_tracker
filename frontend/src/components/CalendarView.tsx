@@ -53,9 +53,9 @@ export function CalendarView({ year, month, entries, plan = [], selected, onChan
           ].filter(Boolean).join(" ");
           return (
             <button key={d} type="button" onClick={() => onSelect(d)} aria-label={d} aria-pressed={d === selected} className={cls}
-              title={pw ? `${pw.workout_type}${pw.target_distance ? ` ${pw.target_distance}` : ""}` : undefined}>
+              title={pw ? `${pw.workout_type}${pw.target_value ?? pw.target_distance ? ` ${pw.target_value ?? pw.target_distance}` : ""}` : undefined}>
               {Number(d.slice(8))}
-              {pw && pw.workout_type !== "rest" && <small className="cal-target">{pw.target_distance ?? "•"}</small>}
+              {pw && pw.workout_type !== "rest" && <small className="cal-target">{pw.target_value ?? pw.target_distance ?? "•"}</small>}
             </button>
           );
         })}

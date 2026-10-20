@@ -75,12 +75,19 @@ class Goal(Base):
     id = Column(Integer, primary_key=True, index=True)
     habit_id = Column(Integer, ForeignKey("habits.id"), nullable=False, index=True)
     metric_id = Column(Integer, ForeignKey("metrics.id", ondelete="SET NULL"), nullable=True)
-    goal_type = Column(String(30), nullable=False)  # 5k | 10k | half_marathon | marathon
-    distance = Column(Float, nullable=False)
+    goal_type = Column(String(30), nullable=False)  # running_plan | frequency | metric_target; legacy race types remain valid
+    race_type = Column(String(30), nullable=True)
+    distance = Column(Float, nullable=False, default=0)
     unit = Column(String(10), default="mi", nullable=False)  # mi | km
     experience_level = Column(String(20), default="beginner", nullable=False)
     start_date = Column(Date, nullable=False)
     target_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    target_value = Column(Float, nullable=True)
+    start_value = Column(Float, nullable=True)
+    per_week = Column(Integer, nullable=True)
+    per_month = Column(Integer, nullable=True)
+    plan_source = Column(String(20), nullable=True)
     status = Column(String(20), default="active", nullable=False)  # active | completed | cancelled
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
