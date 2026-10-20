@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -75,3 +76,55 @@ def test_call_llm_logs_model_and_duration(monkeypatch, caplog):
         assert chat_service.call_llm([]) == "hello"
 
     assert re.search(r"model=test-model duration_seconds=\d+\.\d{3}", caplog.text)
+
+
+def _fake_stream(monkeypatch, lines, status=200):
+    class Resp:
+        status_code = status
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def iter_lines(self):
+            return iter(lines)
+
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(chat_service.httpx, "stream", lambda *a, **k: Resp())
+
+
+def _chunk(text):
+    return "data: " + json.dumps({"choices": [{"delta": {"content": text}}]})
+
+
+def test_stream_llm_parses_sse(monkeypatch):
+    _fake_stream(monkeypatch, [
+        'data: {"choices":[{"delta":{"role":"assistant"}}]}', "", _chunk("Keep "), "", _chunk("going!"), "", "data: [DONE]",
+    ])
+    assert "".join(chat_service.stream_llm([])) == "Keep going!"
+
+
+def test_stream_endpoint_events(monkeypatch):
+    monkeypatch.setattr(chat_service, "stream_llm", lambda m: (t for t in ["Keep ", "going!"]))
+    with TestClient(app) as c:
+        r = c.post("/api/chat/stream", json={"message": "hi"})
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+        tokens = [json.loads(l[6:])["token"] for l in r.text.splitlines() if l.startswith("data: {\"token")]
+        assert "".join(tokens) == "Keep going!" and "event: done" in r.text
+
+
+def test_stream_endpoint_errors(monkeypatch):
+    monkeypatch.setattr(settings, "llm_api_key", None)
+    with TestClient(app) as c:
+        assert c.post("/api/chat/stream", json={"message": "hi"}).status_code == 503
+
+    def broken(messages):
+        yield "partial"
+        raise chat_service.LLMError(502, "boom")
+
+    monkeypatch.setattr(chat_service, "stream_llm", broken)
+    with TestClient(app) as c:
+        r = c.post("/api/chat/stream", json={"message": "hi"})
+        assert r.status_code == 200 and "event: error" in r.text and "boom" in r.text

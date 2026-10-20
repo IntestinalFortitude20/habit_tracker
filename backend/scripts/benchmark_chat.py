@@ -5,7 +5,7 @@ import sys
 import time
 
 from app.core.config import settings
-from app.services.chat import LLMError, call_llm
+from app.services.chat import LLMError, call_llm, stream_llm
 
 PROMPTS = [
     "Suggest one small way to make a morning walk a consistent habit.",
@@ -43,11 +43,13 @@ def summarize(samples: list[float]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark non-streaming AI coach response time.")
     parser.add_argument("--requests", type=int, default=20, help="Number of sequential prompts to send (default: 20).")
+    parser.add_argument("--stream", action="store_true", help="Use the streaming path and report TTFT as well as total time.")
     args = parser.parse_args()
     if args.requests < 1:
         parser.error("--requests must be at least 1")
 
     samples = []
+    ttfts = []
     print(f"Model: {settings.llm_model}; requests: {args.requests}")
     print("The first request is reported as cold; remaining requests are reported as warm.")
     try:
@@ -57,18 +59,30 @@ def main() -> int:
                 {"role": "user", "content": PROMPTS[index % len(PROMPTS)]},
             ]
             started_at = time.perf_counter()
-            call_llm(messages)
+            if args.stream:
+                first = None
+                for _ in stream_llm(messages):
+                    if first is None:
+                        first = time.perf_counter() - started_at
+                ttfts.append(first)
+            else:
+                call_llm(messages)
             samples.append(time.perf_counter() - started_at)
     except LLMError as exc:
         print(f"Benchmark failed: {exc.message}", file=sys.stderr)
         return 1
 
+    if ttfts:
+        print(f"Cold TTFT: {summarize(ttfts[:1])}")
+        if len(ttfts) > 1:
+            print(f"Warm TTFT: {summarize(ttfts[1:])}")
     print(f"Cold total: {summarize(samples[:1])}")
     if len(samples) > 1:
         print(f"Warm total: {summarize(samples[1:])}")
     else:
         print("Warm: not measured (only one request)")
-    print("Non-streaming TTFT equals total response time: text is shown only after the full reply arrives.")
+    if not args.stream:
+        print("Non-streaming TTFT equals total response time: text is shown only after the full reply arrives.")
     return 0
 
 

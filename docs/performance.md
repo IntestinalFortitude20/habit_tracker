@@ -37,3 +37,25 @@ values are reported because a real `llama3.2:3b` run could not be performed
 here. Run the command above on the target hardware and replace this row with
 the reported cold and warm values before making a before/after performance
 claim.
+
+## Streaming (after)
+
+The coach reply is now streamed token by token from `POST /api/chat/stream`
+(`text/event-stream`; `data: {"token": ...}` events, then `event: done`, or
+`event: error` on a mid-stream failure). The non-streaming `POST /api/chat`
+endpoint is unchanged. The chat modal can cancel a reply with the Stop button.
+
+Measure TTFT and total time with the same prompts:
+
+```bash
+python -m scripts.benchmark_chat --stream --requests 20
+```
+
+| Mode | Cold TTFT | Warm TTFT median / p95 | Warm total median / p95 |
+| --- | ---: | ---: | ---: |
+| Before (non-streaming, baseline) | 8.054s | 26.950s / 35.120s | 26.950s / 35.120s |
+| After (streaming) | Not measured | Not measured | Not measured |
+
+The streaming numbers could not be recorded here because no Ollama service or
+model is available in this environment. Run the command above on the baseline
+hardware and fill in the "After" row.
