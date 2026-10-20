@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { deleteHabit } from "../api/habits";
 import { createMetric, deleteMetric, updateMetric } from "../api/metrics";
 import type { Metric, MetricType } from "../types/metric";
 import { Button } from "./Button";
@@ -6,9 +7,16 @@ import { Modal } from "./Modal";
 
 const METRIC_TYPES: MetricType[] = ["boolean", "count", "duration", "rating"];
 
-type Props = { habitId: number; metrics: Metric[]; onClose: () => void; onChanged: () => Promise<void> };
+type Props = {
+  habitId: number;
+  habitName?: string;
+  metrics: Metric[];
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+  onHabitDeleted: () => void;
+};
 
-export function SettingsModal({ habitId, metrics, onClose, onChanged }: Props) {
+export function SettingsModal({ habitId, habitName, metrics, onClose, onChanged, onHabitDeleted }: Props) {
   const [name, setName] = useState("");
   const [type, setType] = useState<MetricType>("count");
   const [unit, setUnit] = useState("");
@@ -17,6 +25,31 @@ export function SettingsModal({ habitId, metrics, onClose, onChanged }: Props) {
   const [editUnit, setEditUnit] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!confirmingDelete) return;
+    // Modal focuses its container on mount; focus Cancel afterwards so it is the default.
+    const t = window.setTimeout(() => cancelRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [confirmingDelete]);
+
+  async function confirmDeleteHabit() {
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteHabit(habitId);
+      onHabitDeleted();
+    } catch (err) {
+      setError("Failed to delete habit.");
+      setConfirmingDelete(false);
+      console.error(err);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function run(action: () => Promise<void>, failMsg: string, okMsg: string) {
     setError(null);
@@ -60,6 +93,23 @@ export function SettingsModal({ habitId, metrics, onClose, onChanged }: Props) {
     void run(() => deleteMetric(habitId, m.id), "Failed to delete metric.", "Metric deleted.");
   }
 
+  if (confirmingDelete) {
+    const label = habitName ? `"${habitName}"` : "this habit";
+    return (
+      <Modal title="Delete habit?" onClose={() => setConfirmingDelete(false)}>
+        <p>
+          Are you sure you want to delete {label}? The habit and all of its entries cannot be recovered.
+        </p>
+        <div className="actions">
+          <button ref={cancelRef} type="button" className="btn btn--secondary" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+            Cancel
+          </button>
+          <Button variant="danger" loading={deleting} onClick={() => void confirmDeleteHabit()}>Delete habit</Button>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal title="Settings" onClose={onClose}>
       {error && <p className="alert alert--error" role="alert">{error}</p>}
@@ -98,6 +148,8 @@ export function SettingsModal({ habitId, metrics, onClose, onChanged }: Props) {
         <input className="input" aria-label="Unit" placeholder="Unit (optional)" value={unit} onChange={(e) => setUnit(e.target.value)} />
         <Button variant="primary" type="submit">Add metric</Button>
       </form>
+      <h3>Danger zone</h3>
+      <Button variant="danger" onClick={() => setConfirmingDelete(true)}>Delete habit</Button>
     </Modal>
   );
 }

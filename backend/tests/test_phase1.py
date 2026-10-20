@@ -1,13 +1,9 @@
-import os
+from datetime import date, timedelta
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_phase1.db"
+from fastapi.testclient import TestClient
 
-from datetime import date, timedelta  # noqa: E402
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-from app.main import app  # noqa: E402
-from app.services.stats import compute_stats  # noqa: E402
+from app.main import app
+from app.services.stats import compute_stats
 
 T = date(2025, 1, 10)
 
@@ -68,3 +64,28 @@ def test_entries_date_range():
         r = c.get(f"/api/habits/{h}/entries?start=2024-01-01&end=2024-01-31&order=asc").json()
         assert [e["date"] for e in r] == ["2024-01-01", "2024-01-15"]
         assert len(c.get(f"/api/habits/{h}/entries?start=2024-01-10").json()) == 2
+
+
+def test_delete_habit_removes_related_rows():
+    from app.db.session import SessionLocal
+    from app.models.models import Entry, Habit, Metric, MetricValue
+
+    with TestClient(app) as c:
+        h = c.post("/api/habits", json={"user_id": 1, "name": "Del"}).json()
+        m = c.post(f"/api/habits/{h['id']}/metrics", json={"name": "Reps", "type": "count"}).json()
+        c.post(f"/api/habits/{h['id']}/entries", json={"date": "2025-01-01", "completed": True, "metric_values": [{"metric_id": m["id"], "value": 3}]})
+        assert c.delete(f"/api/habits/{h['id']}").status_code == 204
+        assert c.get(f"/api/habits/{h['id']}").status_code == 404
+        db = SessionLocal()
+        try:
+            assert db.query(Metric).filter(Metric.habit_id == h["id"]).count() == 0
+            assert db.query(Entry).filter(Entry.habit_id == h["id"]).count() == 0
+            assert db.query(MetricValue).filter(MetricValue.metric_id == m["id"]).count() == 0
+            assert db.query(Habit).filter(Habit.id == h["id"]).count() == 0
+        finally:
+            db.close()
+
+
+def test_delete_unknown_habit_404():
+    with TestClient(app) as c:
+        assert c.delete("/api/habits/999999").status_code == 404
