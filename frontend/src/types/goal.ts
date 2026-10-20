@@ -4,6 +4,14 @@ export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
 export type GoalTypeInfo = { id: GoalType; label: string; distance_miles: number; min_weeks: Record<ExperienceLevel, number> };
 export type GoalPlanDay = { date: string; target_value: number | null; workout_type: "target" | "rest" | "deload"; notes?: string | null };
 
+export type PlanDayEdit = {
+  target_value?: number | null;
+  target_duration_min?: number | null;
+  workout_type?: "rest" | "workout";
+  notes?: string | null;
+  confirm?: boolean;
+};
+
 export type Goal = {
   id: number;
   habit_id: number;
@@ -32,6 +40,7 @@ export type Workout = {
   target_value: number | null;
   phase: string | null;
   notes: string | null;
+  edited: boolean;
   status: "rest" | "completed" | "missed" | "today" | "upcoming";
   entry_id: number | null;
   actual_distance: number | null;

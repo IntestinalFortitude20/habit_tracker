@@ -175,7 +175,11 @@ export function GoalSection({ habitId, metrics, onChanged }: Props) {
           )}
           {progress?.suggest_regenerate && <p className="alert alert--error">You're well behind plan. Regenerate the remaining plan?</p>}
           <div className="actions">
-            {(goal.goal_type === "running_plan" || ["5k", "10k", "half_marathon", "marathon"].includes(goal.goal_type)) && <Button onClick={() => void run(() => regenerateGoal(habitId))}>Regenerate remaining plan</Button>}
+            {(goal.goal_type === "running_plan" || ["5k", "10k", "half_marathon", "marathon"].includes(goal.goal_type)) && <Button onClick={() => {
+              if (!window.confirm("Regenerate the remaining plan (today onward)? Past days are not changed.")) return;
+              const preserve = window.confirm("Keep the days you edited manually in the remaining range?\n\nOK = keep my edited days\nCancel = overwrite them");
+              void run(() => regenerateGoal(habitId, preserve));
+            }}>Regenerate remaining plan</Button>}
             <Button variant="danger" onClick={() => void run(() => cancelGoal(habitId))}>Remove goal</Button>
           </div>
         </div>

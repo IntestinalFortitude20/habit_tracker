@@ -33,6 +33,10 @@ with engine.begin() as connection:
         if name not in goal_columns:
             connection.execute(text(f"ALTER TABLE goals ADD COLUMN {name} {sql_type}"))
 
+    workout_columns = {column["name"] for column in inspect(engine).get_columns("planned_workouts")}
+    if "edited" not in workout_columns:
+        connection.execute(text("ALTER TABLE planned_workouts ADD COLUMN edited BOOLEAN NOT NULL DEFAULT 0"))
+
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
 app.add_middleware(

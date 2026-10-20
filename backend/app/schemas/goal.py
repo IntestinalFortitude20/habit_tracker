@@ -26,6 +26,8 @@ class GoalCreate(BaseModel):
 class GoalRegenerate(BaseModel):
     target_date: dt.date | None = None
     experience_level: Level | None = None
+    confirm: bool = False
+    preserve_edits: bool = True
 
 
 class PlanDay(BaseModel):
@@ -42,8 +44,11 @@ class GoalAccept(BaseModel):
 
 class PlanDayUpdate(BaseModel):
     target_value: float | None = Field(default=None, ge=0)
-    workout_type: Literal["target", "rest", "deload"] | None = None
-    notes: str | None = None
+    target_distance: float | None = Field(default=None, ge=0)
+    target_duration_min: float | None = Field(default=None, ge=0)
+    workout_type: Literal["target", "rest", "deload", "workout"] | None = None
+    notes: str | None = Field(default=None, max_length=200)
+    confirm: bool = False
 
 
 class PlanAdjustment(BaseModel):
@@ -97,6 +102,7 @@ class WorkoutRead(BaseModel):
     target_value: float | None = None
     phase: str | None
     notes: str | None
+    edited: bool = False
     status: str  # rest | completed | missed | today | upcoming
     entry_id: int | None = None
     actual_distance: float | None = None

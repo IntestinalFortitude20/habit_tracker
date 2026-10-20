@@ -141,5 +141,6 @@ input[type="checkbox"] { width: 20px; height: 20px; }
 .cal-day { position: relative; }
 .cal-target { display: block; font-size: 0.65rem; line-height: 1; }
 .cal-day--plan-rest { background: #e6e6f5; }
+.cal-edited { position: absolute; top: 1px; right: 3px; font-size: 0.6rem; }
 .cal-day--plan-missed { background: #fde7c8; }
 .cal-day--type-long, .cal-day--type-race { font-weight: 700; box-shadow: inset 0 0 0 2px #7a86d8; }
