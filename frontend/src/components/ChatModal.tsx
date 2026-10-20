@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import axios from "axios";
-import { sendChat } from "../api/chat";
+import { ChatStreamError, streamChat } from "../api/chat";
 import type { ChatMessage } from "../api/chat";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
@@ -10,11 +9,8 @@ const MAX_HISTORY = 10;
 const MAX_LEN = 2000;
 
 function errorMessage(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === "string") return detail;
-    if (!err.response) return "Could not reach the server. Check your connection.";
-  }
+  if (err instanceof ChatStreamError) return err.message;
+  if (err instanceof TypeError) return "Could not reach the server. Check your connection.";
   return "Something went wrong. Please try again.";
 }
 
@@ -27,24 +23,51 @@ export function ChatModal({ habitId, habitName, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [messages, loading, error]);
 
   async function send(text: string, history: ChatMessage[]) {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let started = false;
     setLoading(true);
     setError(null);
     setLastSent(text);
     try {
-      const { reply } = await sendChat({ message: text, habit_id: habitId, history: history.slice(-MAX_HISTORY) });
-      setMessages((m) => [...m, { role: "assistant", content: reply }]);
+      await streamChat(
+        { message: text, habit_id: habitId, history: history.slice(-MAX_HISTORY) },
+        (token) => {
+          if (!started) {
+            started = true;
+            setMessages((m) => [...m, { role: "assistant", content: token }]);
+          } else {
+            setMessages((m) => [...m.slice(0, -1), { ...m[m.length - 1], content: m[m.length - 1].content + token }]);
+          }
+        },
+        controller.signal,
+      );
       setLastSent(null);
     } catch (err) {
-      setError(errorMessage(err));
+      if (controller.signal.aborted) {
+        setLastSent(null);
+      } else {
+        // drop any partial reply so retry resends from the user message
+        if (started) setMessages((m) => m.slice(0, -1));
+        setError(errorMessage(err));
+      }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setLoading(false);
     }
+  }
+
+  function cancel() {
+    abortRef.current?.abort();
   }
 
   function submit() {
@@ -81,7 +104,7 @@ export function ChatModal({ habitId, habitName, onClose }: Props) {
           {messages.map((m, i) => (
             <div key={i} className={`chat__bubble chat__bubble--${m.role}`}>{m.content}</div>
           ))}
-          {loading && <div className="chat__bubble chat__bubble--assistant" role="status">Thinking…</div>}
+          {loading && messages[messages.length - 1]?.role === "user" && <div className="chat__bubble chat__bubble--assistant" role="status">Thinking…</div>}
           {error && (
             <div className="alert alert--error" role="alert">
               {error} <Button onClick={retry} disabled={loading}>Retry</Button>
@@ -99,7 +122,11 @@ export function ChatModal({ habitId, habitName, onClose }: Props) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
           />
-          <Button type="submit" variant="primary" disabled={loading || !input.trim()}>Send</Button>
+          {loading ? (
+            <Button onClick={cancel}>Stop</Button>
+          ) : (
+            <Button type="submit" variant="primary" disabled={!input.trim()}>Send</Button>
+          )}
         </form>
       </div>
     </Modal>
