@@ -15,3 +15,7 @@ export async function fetchHabit(habitId: number): Promise<Habit> {
   const res = await api.get<Habit>(`/api/habits/${habitId}`);
   return res.data;
 }
+
+export async function deleteHabit(habitId: number): Promise<void> {
+  await api.delete(`/api/habits/${habitId}`);
+}

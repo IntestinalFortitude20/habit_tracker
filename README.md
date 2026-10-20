@@ -68,6 +68,12 @@ habit_tracker/
 
 ## 🖥️ Local Development
 
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+ (with npm)
+- [Ollama](https://ollama.com/download) (for the local AI coach)
+
 ### 1) Backend
 
 ```bash
@@ -76,10 +82,12 @@ python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 # .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cp .env.example .env       # Windows: copy .env.example .env
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend runs on `http://127.0.0.1:8000` (desktop) and `http://<your-lan-ip>:8000` (LAN devices)
+Backend runs on `http://127.0.0.1:8000` (desktop) and `http://<your-lan-ip>:8000` (LAN devices).
+The `.env` file must live in `backend/` and is read at startup (restart after editing). It is git-ignored; never commit it.
 
 ### 2) Frontend
 
@@ -91,22 +99,44 @@ npm run dev -- --host
 
 Frontend runs on `http://localhost:5173` (desktop) and `http://<your-lan-ip>:5173` (LAN devices)
 
-### 3) AI chat setup
+### 3) AI chat setup (Ollama)
 
-The AI coach calls an OpenAI-compatible chat completions API **from the backend only**; the key is never sent to the browser.
+The AI coach calls an OpenAI-compatible chat completions API **from the backend only**; keys are never sent to the browser.
 
-1. Get an API key from your provider (e.g. https://platform.openai.com/api-keys).
-2. `cp backend/.env.example backend/.env` and edit it (`.env` is git-ignored — never commit it):
-   - `LLM_API_KEY` – your key (required)
-   - `LLM_MODEL` – model name (default `gpt-4o-mini`)
-   - `LLM_BASE_URL` – optional, for other OpenAI-compatible providers (default `https://api.openai.com/v1`)
-3. Restart the backend (`.env` is read at startup).
+1. Install Ollama from https://ollama.com/download.
+2. Pull the model: `ollama pull llama3.2:3b`
+3. Confirm it is installed: `ollama list`
+4. Verify Ollama is running: open `http://127.0.0.1:11434` (should say "Ollama is running"), or `curl http://127.0.0.1:11434`. If not, run `ollama serve`.
+5. Make sure `backend/.env` (copied from `backend/.env.example`) contains:
+   ```env
+   LLM_API_KEY=ollama
+   LLM_BASE_URL=http://127.0.0.1:11434/v1
+   LLM_MODEL=llama3.2:3b
+   ```
+   `LLM_API_KEY` is only a placeholder for local Ollama (it is not checked, but must be non-empty). To use OpenAI or another provider, set a real key, its `LLM_BASE_URL` and `LLM_MODEL`.
+6. Restart the backend.
 
 Without a key, `POST /api/chat` returns `503` with a setup hint. Upstream errors map to `502`, timeouts to `504`.
 
 Using the chat: tap the floating **chat bubble button** (bottom-right, "Open AI coach chat") on a habit page (scoped to that habit's metrics, stats and last 30 days of entries) or on the home page (general chat across all habits). Enter sends, Shift+Enter adds a newline; history lives only in the open panel.
 
 **Mobile modals:** modals no longer autofocus inputs (so the keyboard only opens when you tap a field), sit toward the top on small screens, resize with the visual viewport, and scroll the focused field into view.
+
+### Restart checklist
+
+1. Start Ollama (`ollama serve`, or the desktop app) and check `http://127.0.0.1:11434`.
+2. Start the backend: `cd backend && source .venv/bin/activate && python -m uvicorn app.main:app --reload --port 8000`
+3. Start the frontend: `cd frontend && npm run dev`
+4. Health checks: `http://127.0.0.1:8000/health` returns OK, `ollama list` shows `llama3.2:3b`.
+5. Open `http://localhost:5173`, click the chat bubble and send a message to test the AI coach.
+
+### Troubleshooting
+
+- **Ollama not running / connection refused (502):** start it with `ollama serve` and check `http://127.0.0.1:11434`.
+- **503 setup hint:** `LLM_API_KEY` is empty or `.env` is in the wrong place. It must be `backend/.env`, not the repo root or `frontend/`.
+- **Changed `.env` but nothing changed:** restart the backend; settings are read at startup.
+- **404 / upstream errors from the model:** `LLM_BASE_URL` must end in `/v1` (`http://127.0.0.1:11434/v1`). Also check `LLM_MODEL` matches `ollama list`.
+- **Slow first reply:** the model loads on first use; see [docs/performance.md](docs/performance.md) (once available) for performance notes.
 
 ### 4) LAN Test Checklist
 

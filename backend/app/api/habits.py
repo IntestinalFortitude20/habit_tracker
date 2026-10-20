@@ -32,3 +32,10 @@ def list_habits(db: Session = Depends(get_db)):
 @router.get("/{habit_id}", response_model=HabitRead)
 def get_habit(habit_id: int, db: Session = Depends(get_db)):
     return get_habit_or_404(db, habit_id)
+
+
+@router.delete("/{habit_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_habit(habit_id: int, db: Session = Depends(get_db)):
+    habit = get_habit_or_404(db, habit_id)
+    db.delete(habit)
+    db.commit()

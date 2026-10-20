@@ -1,4 +1,8 @@
 from datetime import date, timedelta
+import json
+import logging
+import time
+from collections.abc import Iterator
 
 import httpx
 from sqlalchemy.orm import Session
@@ -10,6 +14,7 @@ from app.services.stats import compute_stats
 
 MAX_HISTORY = 10
 RECENT_DAYS = 30
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are a supportive, encouraging habit coach inside a habit tracker app. "
@@ -108,26 +113,80 @@ def build_messages(context: str, message: str, history: list[dict], today: date 
 
 
 def call_llm(messages: list[dict]) -> str:
-    if not settings.llm_api_key:
-        raise LLMError(503, "AI chat is not configured. Set LLM_API_KEY in backend/.env and restart the backend.")
-    url = settings.llm_base_url.rstrip("/") + "/chat/completions"
+    started_at = time.perf_counter()
     try:
-        resp = httpx.post(
-            url,
-            headers={"Authorization": "Bearer " + settings.llm_api_key},
-            json={"model": settings.llm_model, "messages": messages},
-            timeout=settings.llm_timeout_seconds,
+        if not settings.llm_api_key:
+            raise LLMError(503, "AI chat is not configured. Set LLM_API_KEY in backend/.env and restart the backend.")
+        url = settings.llm_base_url.rstrip("/") + "/chat/completions"
+        try:
+            resp = httpx.post(
+                url,
+                headers={"Authorization": "Bearer " + settings.llm_api_key},
+                json={"model": settings.llm_model, "messages": messages},
+                timeout=settings.llm_timeout_seconds,
+            )
+        except httpx.TimeoutException:
+            raise LLMError(504, "The AI service took too long to respond. Please try again.")
+        except httpx.HTTPError:
+            raise LLMError(502, "Could not reach the AI service. Please try again later.")
+        if resp.status_code >= 400:
+            raise LLMError(502, "The AI service returned an error. Please try again later.")
+        try:
+            reply = resp.json()["choices"][0]["message"]["content"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            raise LLMError(502, "The AI service returned an unexpected response.")
+        if not isinstance(reply, str) or not reply.strip():
+            raise LLMError(502, "The AI service returned an empty response.")
+        return reply.strip()
+    finally:
+        logger.info(
+            "LLM response model=%s duration_seconds=%.3f",
+            settings.llm_model,
+            time.perf_counter() - started_at,
         )
-    except httpx.TimeoutException:
-        raise LLMError(504, "The AI service took too long to respond. Please try again.")
-    except httpx.HTTPError:
-        raise LLMError(502, "Could not reach the AI service. Please try again later.")
-    if resp.status_code >= 400:
-        raise LLMError(502, "The AI service returned an error. Please try again later.")
+
+
+def stream_llm(messages: list[dict]) -> Iterator[str]:
+    """Yield reply tokens from the OpenAI-compatible endpoint using SSE streaming."""
+    started_at = time.perf_counter()
     try:
-        reply = resp.json()["choices"][0]["message"]["content"]
-    except (ValueError, KeyError, IndexError, TypeError):
-        raise LLMError(502, "The AI service returned an unexpected response.")
-    if not isinstance(reply, str) or not reply.strip():
-        raise LLMError(502, "The AI service returned an empty response.")
-    return reply.strip()
+        if not settings.llm_api_key:
+            raise LLMError(503, "AI chat is not configured. Set LLM_API_KEY in backend/.env and restart the backend.")
+        url = settings.llm_base_url.rstrip("/") + "/chat/completions"
+        received = False
+        try:
+            with httpx.stream(
+                "POST",
+                url,
+                headers={"Authorization": "Bearer " + settings.llm_api_key},
+                json={"model": settings.llm_model, "messages": messages, "stream": True},
+                timeout=settings.llm_timeout_seconds,
+            ) as resp:
+                if resp.status_code >= 400:
+                    raise LLMError(502, "The AI service returned an error. Please try again later.")
+                for line in resp.iter_lines():
+                    line = line.strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        token = json.loads(data)["choices"][0]["delta"].get("content")
+                    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+                        raise LLMError(502, "The AI service returned an unexpected response.")
+                    if isinstance(token, str) and token:
+                        received = True
+                        yield token
+        except httpx.TimeoutException:
+            raise LLMError(504, "The AI service took too long to respond. Please try again.")
+        except httpx.HTTPError:
+            raise LLMError(502, "Could not reach the AI service. Please try again later.")
+        if not received:
+            raise LLMError(502, "The AI service returned an empty response.")
+    finally:
+        logger.info(
+            "LLM stream model=%s duration_seconds=%.3f",
+            settings.llm_model,
+            time.perf_counter() - started_at,
+        )

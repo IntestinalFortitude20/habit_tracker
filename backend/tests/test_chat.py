@@ -1,15 +1,15 @@
-import os
+import json
+import logging
+import re
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_chat.db"
+from datetime import date
 
-from datetime import date  # noqa: E402
+from fastapi.testclient import TestClient
 
-from fastapi.testclient import TestClient  # noqa: E402
-
-from app.core.config import settings  # noqa: E402
-from app.db.session import SessionLocal  # noqa: E402
-from app.main import app  # noqa: E402
-from app.services import chat as chat_service  # noqa: E402
+from app.core.config import settings
+from app.db.session import SessionLocal
+from app.main import app
+from app.services import chat as chat_service
 
 
 def _make_habit(c):
@@ -56,3 +56,72 @@ def test_chat_with_mocked_llm(monkeypatch):
         assert len(captured["messages"]) == 12  # system + 10 history + user
         assert c.post("/api/chat", json={"message": "hi", "habit_id": 99999}).status_code == 404
         assert c.post("/api/chat", json={"message": "x" * 2001}).status_code == 422
+
+
+def test_call_llm_logs_model_and_duration(monkeypatch, caplog):
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "hello"}}]}
+
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(settings, "llm_model", "test-model")
+    monkeypatch.setattr(chat_service.httpx, "post", lambda *args, **kwargs: Response())
+    with caplog.at_level(logging.INFO, logger=chat_service.__name__):
+        assert chat_service.call_llm([]) == "hello"
+
+    assert re.search(r"model=test-model duration_seconds=\d+\.\d{3}", caplog.text)
+
+
+def _fake_stream(monkeypatch, lines, status=200):
+    class Resp:
+        status_code = status
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def iter_lines(self):
+            return iter(lines)
+
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(chat_service.httpx, "stream", lambda *a, **k: Resp())
+
+
+def _chunk(text):
+    return "data: " + json.dumps({"choices": [{"delta": {"content": text}}]})
+
+
+def test_stream_llm_parses_sse(monkeypatch):
+    _fake_stream(monkeypatch, [
+        'data: {"choices":[{"delta":{"role":"assistant"}}]}', "", _chunk("Keep "), "", _chunk("going!"), "", "data: [DONE]",
+    ])
+    assert "".join(chat_service.stream_llm([])) == "Keep going!"
+
+
+def test_stream_endpoint_events(monkeypatch):
+    monkeypatch.setattr(chat_service, "stream_llm", lambda m: (t for t in ["Keep ", "going!"]))
+    with TestClient(app) as c:
+        r = c.post("/api/chat/stream", json={"message": "hi"})
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+        tokens = [json.loads(l[6:])["token"] for l in r.text.splitlines() if l.startswith("data: {\"token")]
+        assert "".join(tokens) == "Keep going!" and "event: done" in r.text
+
+
+def test_stream_endpoint_errors(monkeypatch):
+    monkeypatch.setattr(settings, "llm_api_key", None)
+    with TestClient(app) as c:
+        assert c.post("/api/chat/stream", json={"message": "hi"}).status_code == 503
+
+    def broken(messages):
+        yield "partial"
+        raise chat_service.LLMError(502, "boom")
+
+    monkeypatch.setattr(chat_service, "stream_llm", broken)
+    with TestClient(app) as c:
+        r = c.post("/api/chat/stream", json={"message": "hi"})
+        assert r.status_code == 200 and "event: error" in r.text and "boom" in r.text

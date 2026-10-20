@@ -89,3 +89,13 @@ class HabitStats(BaseModel):
     completion_rate_30d: float
     total_completed_days: int
     total_logged_days: int
+
+
+class HabitTemplate(BaseModel):
+    id: str
+    name: str
+    description: str
+    cadence: str
+    cue: str
+    tiny_version: str
+    metrics: list[MetricCreate]

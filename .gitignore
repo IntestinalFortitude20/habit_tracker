@@ -151,3 +151,4 @@ vite.config.ts.timestamp-*
 # Local SQLite / test DBs
 *.db
 __pycache__/
+test_*.db

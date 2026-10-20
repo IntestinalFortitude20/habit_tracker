@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchEntriesInRange, fetchLatestEntry } from "../api/entries";
 import { fetchHabit } from "../api/habits";
 import { fetchGoal, fetchPlan } from "../api/goals";
@@ -22,6 +22,7 @@ import type { Metric } from "../types/metric";
 
 export function HabitDetailPage() {
   const id = Number(useParams().habitId);
+  const navigate = useNavigate();
   const now = new Date();
   const [habit, setHabit] = useState<Habit | null>(null);
   const [metrics, setMetrics] = useState<Metric[]>([]);
@@ -130,8 +131,10 @@ export function HabitDetailPage() {
       {showSettings && (
         <SettingsModal
           habitId={id}
+          habitName={habit?.name}
           metrics={metrics}
           onClose={() => setShowSettings(false)}
+          onHabitDeleted={() => navigate("/habits", { replace: true })}
           onChanged={async () => { await Promise.all([refreshMetrics(), refresh()]); }}
         />
       )}
