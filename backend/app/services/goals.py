@@ -255,8 +255,8 @@ def update_plan_day(db: Session, goal: Goal, day: date, updates: dict, today: da
         for field, value in default.items():
             if updates.get(field) is None:
                 updates[field] = value
-        workout.workout_type = "deload" if new_type == "deload" else updates.pop("workout_type")
-        updates.pop("workout_type", None)
+        default_type = updates.pop("workout_type")
+        workout.workout_type = "deload" if new_type == "deload" else default_type
     elif new_type == "deload":
         workout.workout_type = "deload"
     if workout.workout_type == "rest" and not to_rest:

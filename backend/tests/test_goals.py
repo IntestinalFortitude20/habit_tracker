@@ -66,7 +66,7 @@ def test_goal_api_flow():
         assert after["percent_of_target"] == 50.0 and after["difference"] < 0
         prog = c.get(f"/api/habits/{h}/goal/progress").json()
         assert prog["weeks_remaining"] == 30 and prog["on_track"]
-        assert c.post(f"/api/habits/{h}/goal/regenerate", json={}).status_code == 422
+        assert c.post(f"/api/habits/{h}/goal/regenerate", json={}).status_code == 409
         assert c.post(f"/api/habits/{h}/goal/regenerate", json={"confirm": True}).status_code == 200
         assert c.delete(f"/api/habits/{h}/goal").status_code == 204
         assert c.get(f"/api/habits/{h}/goal").status_code == 404

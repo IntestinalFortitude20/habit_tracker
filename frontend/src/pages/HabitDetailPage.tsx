@@ -149,6 +149,7 @@ export function HabitDetailPage() {
       )}
       {selectedDate && !logDate && (
         <DayDetailModal
+          key={selectedDate}
           date={selectedDate}
           entry={findEntry(selectedDate)}
           hasPlan={plan.length > 0}
