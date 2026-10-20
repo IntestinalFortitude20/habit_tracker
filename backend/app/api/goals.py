@@ -63,6 +63,8 @@ def check_feasibility(
 ):
     get_habit_or_404(db, habit_id)
     start = start_date or date.today()
+    if goal_type not in training.goal_types():
+        raise HTTPException(status_code=422, detail="Feasibility is only available for running plans.")
     if target_date <= start:
         raise HTTPException(status_code=422, detail={"message": "Target date must be after the start date."})
     return training.check_feasibility(goal_type, experience_level, start, target_date)

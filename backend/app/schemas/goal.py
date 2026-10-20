@@ -31,7 +31,7 @@ class GoalRegenerate(BaseModel):
 class PlanDay(BaseModel):
     date: dt.date
     target_value: float | None = Field(default=None, ge=0)
-    workout_type: str = "target"
+    workout_type: Literal["target", "rest", "deload"] = "target"
     notes: str | None = None
 
 

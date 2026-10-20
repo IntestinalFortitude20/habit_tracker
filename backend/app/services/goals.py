@@ -152,7 +152,7 @@ def _save_metric_plan(db: Session, goal: Goal, plan: list[PlanDay] | list[dict])
             goal_id=goal.id,
             date=d["date"],
             workout_type=d.get("workout_type") or "target",
-            target_distance=d.get("target_value"),
+            target_distance=d.get("target_value", d.get("target_distance")),
             notes=d.get("notes"),
             phase=None,
             target_duration_min=None,
@@ -163,7 +163,7 @@ def _save_metric_plan(db: Session, goal: Goal, plan: list[PlanDay] | list[dict])
 
 def create_goal(db: Session, habit: Habit, payload: GoalCreate, plan: list[PlanDay] | None = None) -> tuple[Goal, dict | None, int]:
     start = payload.start_date or date.today()
-    if payload.plan_source == "ai":
+    if payload.plan_source == "ai" and plan is None:
         raise HTTPException(status_code=422, detail="Review and accept an AI draft before saving the goal.")
     if payload.plan_source == "manual" and not plan:
         raise HTTPException(status_code=422, detail="Add at least one target day to the manual plan.")
@@ -209,16 +209,17 @@ def update_plan_day(db: Session, goal: Goal, day: date, updates: dict) -> dict:
 
 def regenerate_plan(db: Session, goal: Goal, target: date | None, level: str | None, today: date | None = None) -> tuple[dict, int]:
     """Re-plan the remaining days (today onward). Past workouts and entries are kept; missed work is not caught up."""
-    if goal.goal_type != "running_plan":
+    if goal.goal_type != "running_plan" and goal.goal_type not in training.goal_types():
         raise HTTPException(status_code=422, detail="Only running plans can be regenerated this way.")
     today = today or date.today()
     new_target = target or goal.target_date
     new_level = level or goal.experience_level
     start = max(today, goal.start_date)
-    feas = feasibility_or_422(goal.goal_type, new_level, start, new_target)
+    feas = feasibility_or_422(goal.race_type or goal.goal_type, new_level, start, new_target)
     try:
         db.query(PlannedWorkout).filter(PlannedWorkout.goal_id == goal.id, PlannedWorkout.date >= start).delete()
         goal.target_date = new_target
+        goal.end_date = new_target
         goal.experience_level = new_level
         count = _store_plan(db, goal, start)
         db.commit()
@@ -416,14 +417,16 @@ def compute_progress(db: Session, goal: Goal, today: date | None = None) -> dict
         plans = list_workouts(db, goal, today, today, today)
         entries = db.query(Entry).filter(
             Entry.habit_id == goal.habit_id, Entry.date >= goal.start_date, Entry.date <= today
-        ).all()
-        actuals = [
-            mv.value
-            for entry in entries
-            for mv in entry.metric_values
-            if mv.metric_id == goal.metric_id
-        ]
-        actual = actuals[-1] if actuals else goal.start_value or 0
+        ).order_by(Entry.date.desc()).all()
+        actual = next(
+            (
+                mv.value
+                for entry in entries
+                for mv in entry.metric_values
+                if mv.metric_id == goal.metric_id
+            ),
+            goal.start_value or 0,
+        )
         daily_target = plans[0]["target_value"] if plans else goal.target_value
         on_track = actual >= (daily_target or 0)
         finished = today > goal.target_date

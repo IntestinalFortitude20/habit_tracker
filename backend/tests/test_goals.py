@@ -1,4 +1,5 @@
 import os
+import json
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_goals.db"
 
@@ -68,3 +69,94 @@ def test_goal_api_flow():
         assert c.post(f"/api/habits/{h}/goal/regenerate", json={}).status_code == 200
         assert c.delete(f"/api/habits/{h}/goal").status_code == 204
         assert c.get(f"/api/habits/{h}/goal").status_code == 404
+
+
+def test_frequency_and_metric_goal_progress_and_plan_edits():
+    with TestClient(app) as c:
+        habit_id = c.post("/api/habits", json={"user_id": 1, "name": "strength"}).json()["id"]
+        frequency = c.post(f"/api/habits/{habit_id}/goal", json={
+            "goal_type": "frequency", "per_week": 4, "per_month": 15,
+        })
+        assert frequency.status_code == 201
+        assert frequency.json()["goal"]["end_date"] is None
+        for offset in (0, 1):
+            c.post(f"/api/habits/{habit_id}/entries", json={
+                "date": (date.today() - timedelta(days=offset)).isoformat(), "completed": True,
+            })
+        progress = c.get(f"/api/habits/{habit_id}/goal/progress").json()
+        assert progress["week_completed"] == 2
+        assert progress["week_target"] == 4
+        assert progress["month_completed"] == 2
+        assert progress["month_target"] == 15
+
+        metric_id = c.post(f"/api/habits/{habit_id}/metrics", json={
+            "name": "Reps", "type": "count", "unit": "reps",
+        }).json()["id"]
+        c.delete(f"/api/habits/{habit_id}/goal")
+        target = date.today() + timedelta(days=4)
+        created = c.post(f"/api/habits/{habit_id}/goal", json={
+            "goal_type": "metric_target",
+            "metric_id": metric_id,
+            "target_value": 40,
+            "start_value": 10,
+            "target_date": target.isoformat(),
+            "plan_source": "linear",
+        })
+        assert created.status_code == 201
+        today = date.today().isoformat()
+        plan = c.get(f"/api/habits/{habit_id}/goal/plan?start={today}&end={today}").json()
+        assert plan[0]["target_value"] == 10
+        changed = c.put(f"/api/habits/{habit_id}/goal/plan/{today}", json={
+            "target_value": 12, "workout_type": "deload",
+        })
+        assert changed.status_code == 200
+        assert changed.json()["target_value"] == 12
+        assert changed.json()["workout_type"] == "deload"
+        assert c.get(f"/api/habits/{habit_id}/goal/progress").json()["goal"]["plan_source"] == "linear"
+
+
+def test_goal_validation_rejects_invalid_metric_and_missing_frequency_target():
+    with TestClient(app) as c:
+        habit_id = c.post("/api/habits", json={"user_id": 1, "name": "habit"}).json()["id"]
+        other_habit_id = c.post("/api/habits", json={"user_id": 1, "name": "other"}).json()["id"]
+        metric_id = c.post(f"/api/habits/{other_habit_id}/metrics", json={
+            "name": "Reps", "type": "count", "unit": "reps",
+        }).json()["id"]
+        missing_frequency = c.post(f"/api/habits/{habit_id}/goal", json={"goal_type": "frequency"})
+        assert missing_frequency.status_code == 422
+        invalid_metric = c.post(f"/api/habits/{habit_id}/goal", json={
+            "goal_type": "metric_target", "metric_id": metric_id, "target_value": 20,
+            "target_date": (date.today() + timedelta(days=10)).isoformat(), "plan_source": "linear",
+        })
+        assert invalid_metric.status_code == 422
+
+
+def test_ai_plan_is_draft_until_accepted(monkeypatch):
+    from app.services import chat
+
+    with TestClient(app) as c:
+        habit_id = c.post("/api/habits", json={"user_id": 1, "name": "lifting"}).json()["id"]
+        metric_id = c.post(f"/api/habits/{habit_id}/metrics", json={
+            "name": "Reps", "type": "count", "unit": "reps",
+        }).json()["id"]
+        start = date.today()
+        end = start + timedelta(days=2)
+        days = [
+            {"date": (start + timedelta(days=offset)).isoformat(), "target_value": 10 + offset * 5,
+             "workout_type": "target", "notes": None}
+            for offset in range(3)
+        ]
+        monkeypatch.setattr(chat, "call_llm", lambda messages: json.dumps({"days": days}))
+        payload = {
+            "goal_type": "metric_target", "metric_id": metric_id, "target_value": 20,
+            "target_date": end.isoformat(), "plan_source": "ai",
+        }
+        draft = c.post(f"/api/habits/{habit_id}/goal/draft", json=payload)
+        assert draft.status_code == 200
+        assert len(draft.json()["plan"]) == 3
+        assert c.get(f"/api/habits/{habit_id}/goal").status_code == 404
+        accepted = c.post(f"/api/habits/{habit_id}/goal/accept", json={
+            "goal": payload, "plan": draft.json()["plan"],
+        })
+        assert accepted.status_code == 201
+        assert accepted.json()["goal"]["plan_source"] == "ai"

@@ -115,7 +115,7 @@ export function SettingsModal({ habitId, habitName, metrics, onClose, onChanged,
     <Modal title="Settings" onClose={onClose}>
       {error && <p className="alert alert--error" role="alert">{error}</p>}
       {success && <p className="alert alert--success" role="status">{success}</p>}
-      <GoalSection habitId={habitId} onChanged={onChanged} />
+      <GoalSection habitId={habitId} metrics={metrics} onChanged={onChanged} />
       <h3>Metrics</h3>
       {metrics.length === 0 ? <p className="empty">No metrics yet.</p> : (
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
